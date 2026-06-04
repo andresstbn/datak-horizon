@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: datak-horizon-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-horizon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-horizon}
+      POSTGRES_DB: ${POSTGRES_DB:-datak_horizon}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      # Postgres 18 stores data in a subdirectory; mount the parent path.
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-horizon} -d ${POSTGRES_DB:-datak_horizon}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

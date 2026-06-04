@@ -1,0 +1,51 @@
+{
+  "name": "datak-horizon",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:unit": "vitest --project unit",
+    "test:nuxt": "vitest --project nuxt",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx server/db/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx server/db/seed.ts"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.111",
+    "@iconify-json/simple-icons": "^1.2.84",
+    "@nuxt/test-utils": "4.0.3",
+    "@nuxt/ui": "^4.8.1",
+    "drizzle-orm": "^0.44.6",
+    "firebase": "^12.4.0",
+    "firebase-admin": "^13.5.0",
+    "nuxt": "^4.4.6",
+    "postgres": "^3.4.7",
+    "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.15.2",
+    "@vitest/coverage-v8": "^4.1.8",
+    "@vue/test-utils": "^2.4.10",
+    "dotenv": "^17.2.3",
+    "drizzle-kit": "^0.31.5",
+    "eslint": "^10.4.1",
+    "pug": "^3.0.4",
+    "tsx": "^4.20.6",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8",
+    "vue-tsc": "^3.3.3"
+  },
+  "packageManager": "pnpm@11.5.0"
+}
