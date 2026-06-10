@@ -4,7 +4,7 @@ defineProps<{
   pageTitle?: string
 }>()
 
-const { profile, isAuthenticated, isLoading, loginWithGoogle, logout } = useAuth()
+const { profile, isReady, isAuthenticated, isLoading, loginWithGoogle, logout } = useAuth()
 
 const accountItems = computed(() => [
   [
@@ -34,7 +34,10 @@ header(class="flex h-[60px] shrink-0 items-center gap-3 border-b border-default 
   .ml-auto.flex.items-center.gap-2
     UColorModeButton
 
-    UDropdownMenu(v-if="isAuthenticated" :items="accountItems")
+    //- Avoid flashing the login button before the auth state is resolved.
+    USkeleton.size-8.rounded-full(v-if="!isReady")
+
+    UDropdownMenu(v-else-if="isAuthenticated" :items="accountItems")
       UAvatar(
         :src="profile?.photoUrl ?? undefined"
         :alt="profile?.displayName ?? profile?.email ?? 'Cuenta'"

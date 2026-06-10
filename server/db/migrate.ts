@@ -6,15 +6,14 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
 
+import { getDbConfig } from './client'
+
 /**
  * Standalone migration runner. Applies every pending SQL migration found in
  * `server/db/migrations`. Run with `pnpm db:migrate`.
  */
 async function main() {
-  const connectionString = process.env.DATABASE_URL
-  if (!connectionString) {
-    throw new Error('DATABASE_URL is not set.')
-  }
+  const config = getDbConfig()
 
   const migrationsFolder = resolve(
     dirname(fileURLToPath(import.meta.url)),
@@ -22,7 +21,9 @@ async function main() {
   )
 
   // A dedicated single-connection client is recommended for migrations.
-  const client = postgres(connectionString, { max: 1 })
+  const client = typeof config === 'string'
+    ? postgres(config, { max: 1 })
+    : postgres({ ...config, max: 1 })
   const db = drizzle(client)
 
   console.log('Running migrations…')

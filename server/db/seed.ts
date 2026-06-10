@@ -1,14 +1,13 @@
 import process from 'node:process'
 import 'dotenv/config'
-import { eq } from 'drizzle-orm'
 import { closeDb, getDb } from './client'
 import {
-  comments,
-  decisions,
-  initiativeActivity,
+  aiArtifacts,
+  conversationMessages,
+  conversations,
+  insights,
   initiatives,
-  specifications,
-  specificationVersions,
+  requirements,
   users
 } from './schema'
 
@@ -18,7 +17,6 @@ import {
  *
  * Run with `pnpm db:seed`.
  */
-/** Assert that an inserted row exists (returning() yields a possibly-empty array). */
 function first<T>(rows: T[], label: string): T {
   const row = rows[0]
   if (!row) {
@@ -32,11 +30,11 @@ async function main() {
 
   console.log('Clearing existing data…')
   // Order matters because of FK constraints (children first).
-  await db.delete(initiativeActivity)
-  await db.delete(comments)
-  await db.delete(decisions)
-  await db.delete(specificationVersions)
-  await db.delete(specifications)
+  await db.delete(aiArtifacts)
+  await db.delete(requirements)
+  await db.delete(insights)
+  await db.delete(conversationMessages)
+  await db.delete(conversations)
   await db.delete(initiatives)
   await db.delete(users)
 
@@ -73,145 +71,205 @@ async function main() {
     .insert(initiatives)
     .values([
       {
-        title: 'Portal único de clientes',
-        slug: 'portal-unico-clientes',
-        description:
-          'Unificar el acceso de clientes a documentos, facturas y soporte en un único portal.',
-        status: 'in_progress',
+        title: 'IVA diferencial',
+        slug: 'iva-diferencial',
+        description: 'Refinamiento colaborativo del impuesto IVA diferencial para servicios digitales y plataformas SaaS.',
+        status: 'refinement',
         priority: 'high',
         risk: 'medium',
+        health: 'on_track',
         functionalOwnerId: ana.id,
         technicalOwnerId: luis.id,
         createdById: ana.id,
         targetDate: new Date('2026-09-30'),
         committedDate: new Date('2026-08-31'),
-        estimatedDate: new Date('2026-10-15'),
-        isDelayed: true,
-        delayReason: 'Dependencia pendiente del proveedor de identidad.'
+        estimatedDate: new Date('2026-09-15')
       },
       {
-        title: 'Rediseño del flujo de facturación',
-        slug: 'rediseno-flujo-facturacion',
-        description:
-          'Simplificar la generación y el envío de facturas para reducir errores manuales.',
-        status: 'in_review',
+        title: 'Portal único de clientes',
+        slug: 'portal-unico-clientes',
+        description: 'Unificar el acceso de clientes a documentos, facturas y soporte en un único portal.',
+        status: 'in_development',
         priority: 'medium',
         risk: 'low',
+        health: 'at_risk',
         functionalOwnerId: marta.id,
         technicalOwnerId: luis.id,
         createdById: marta.id,
         targetDate: new Date('2026-07-15'),
-        committedDate: new Date('2026-07-15')
+        committedDate: new Date('2026-07-15'),
+        delayReason: 'Dependencia técnica en SSO'
       }
     ])
     .returning()
-  const portal = first(seedInitiatives, 'initiative')
-  const billing = seedInitiatives[1] ?? portal
+  const iva = first(seedInitiatives, 'initiative')
+  const portal = seedInitiatives[1] ?? iva
 
-  console.log('Inserting specifications…')
-  const portalSpec = first(
-    await db.insert(specifications).values({ initiativeId: portal.id }).returning(),
-    'specification'
-  )
-
-  const portalVersions = await db
-    .insert(specificationVersions)
+  console.log('Inserting conversations…')
+  const seedConversations = await db
+    .insert(conversations)
     .values([
       {
-        specificationId: portalSpec.id,
-        version: 1,
-        status: 'archived',
-        authorId: ana.id,
-        summary: 'Versión inicial de la especificación.',
-        sections: {
-          contexto: 'Los clientes acceden hoy a la información por canales dispersos.',
-          problema: 'No existe un punto único de acceso.',
-          objetivo: 'Centralizar el acceso en un portal.'
-        }
+        initiativeId: iva.id,
+        title: 'Discusión inicial de alcance',
+        source: 'manual',
+        createdById: marta.id
       },
       {
-        specificationId: portalSpec.id,
-        version: 2,
-        status: 'approved',
-        authorId: ana.id,
-        approvedById: ana.id,
-        approvedAt: new Date('2026-05-20'),
-        summary: 'Se añade el alcance de autenticación SSO.',
-        sections: {
-          contexto: 'Los clientes acceden hoy a la información por canales dispersos.',
-          problema: 'No existe un punto único de acceso ni autenticación unificada.',
-          objetivo: 'Centralizar el acceso y ofrecer SSO.',
-          alcance: 'Documentos, facturas y soporte.',
-          fueraDeAlcance: 'Pagos en línea (fase futura).'
-        }
+        initiativeId: iva.id,
+        title: 'Preguntas del equipo de ingeniería',
+        source: 'slack_import',
+        createdById: luis.id
+      },
+      {
+        initiativeId: portal.id,
+        title: 'Soporte para clientes externos',
+        source: 'meeting',
+        createdById: ana.id
       }
     ])
     .returning()
-  // version 2 is the approved version (index 1 of the inserted rows).
-  const portalV2 = portalVersions[1] ?? first(portalVersions, 'specification version')
+  const conv1 = first(seedConversations, 'conversation')
+  const conv2 = seedConversations[1] ?? conv1
+  const conv3 = seedConversations[2] ?? conv1
 
-  // The approved version is the current source of truth.
+  console.log('Inserting conversation messages…')
   await db
-    .update(specifications)
-    .set({ currentVersionId: portalV2.id })
-    .where(eq(specifications.id, portalSpec.id))
-
-  await db
-    .insert(specifications)
-    .values({ initiativeId: billing.id })
-    .returning()
-
-  console.log('Inserting decisions…')
-  await db.insert(decisions).values([
-    {
-      initiativeId: portal.id,
-      title: 'Usar Firebase Authentication como proveedor de identidad',
-      status: 'accepted',
-      context: 'Necesitamos autenticación con Google para usuarios internos.',
-      alternatives: 'Auth0, Keycloak autohospedado, solución propia.',
-      decision: 'Adoptar Firebase Authentication con el proveedor de Google.',
-      rationale: 'Menor coste operativo y rápida integración con el stack actual.',
-      consequences: 'Dependencia del ecosistema Firebase para identidad.',
-      authorId: luis.id
-    }
-  ])
-
-  console.log('Inserting comments…')
-  const question = first(
-    await db
-      .insert(comments)
-      .values({
-        initiativeId: portal.id,
+    .insert(conversationMessages)
+    .values([
+      {
+        conversationId: conv1.id,
         authorId: marta.id,
-        body: '¿El portal debe soportar también clientes sin cuenta de Google?',
-        isQuestion: true
-      })
-      .returning(),
-    'comment'
-  )
+        role: 'user',
+        contentType: 'markdown',
+        body: 'Hola a todos. Iniciamos la conversación para definir el alcance del **IVA diferencial** para la venta de servicios SaaS en el mercado local.'
+      },
+      {
+        conversationId: conv1.id,
+        authorId: luis.id,
+        role: 'assistant',
+        contentType: 'markdown',
+        body: 'Entendido. Según las normativas tributarias recientes, el IVA diferencial aplica a tasas del **10%** en comparación con la tasa general del **19%**.'
+      },
+      {
+        conversationId: conv1.id,
+        authorId: marta.id,
+        role: 'user',
+        contentType: 'markdown',
+        body: '¿Necesitamos diferenciar esto por país de facturación o es a nivel nacional?'
+      },
+      {
+        conversationId: conv1.id,
+        authorId: luis.id,
+        role: 'assistant',
+        contentType: 'markdown',
+        body: 'Es a nivel nacional, pero debemos validar la dirección de facturación y el emisor del medio de pago para aplicar el impuesto correcto.'
+      },
+      {
+        conversationId: conv2.id,
+        authorId: luis.id,
+        role: 'user',
+        contentType: 'markdown',
+        body: '¿Cómo implementaremos el validador del país del emisor? ¿Con un servicio externo?'
+      },
+      {
+        conversationId: conv2.id,
+        authorId: ana.id,
+        role: 'assistant',
+        contentType: 'markdown',
+        body: 'Podemos usar una base de datos local de prefijos BIN de tarjetas. No es necesario realizar llamadas externas en tiempo de pago.'
+      },
+      {
+        conversationId: conv3.id,
+        authorId: ana.id,
+        role: 'user',
+        contentType: 'markdown',
+        body: '¿El portal de clientes debe soportar autenticación por email/password clásica o solo Google?'
+      }
+    ])
 
-  await db.insert(comments).values({
-    initiativeId: portal.id,
-    parentId: question.id,
-    authorId: luis.id,
-    body: 'De momento solo cuentas corporativas con Google.'
-  })
+  console.log('Inserting insights…')
+  await db
+    .insert(insights)
+    .values([
+      {
+        initiativeId: iva.id,
+        sourceConversationId: conv1.id,
+        type: 'constraint',
+        body: 'El IVA diferencial aplica únicamente a servicios SaaS facturados localmente con tarjeta emitida en el país.',
+        source: 'manual',
+        confidence: 0.95,
+        authorId: marta.id
+      },
+      {
+        initiativeId: iva.id,
+        sourceConversationId: conv2.id,
+        type: 'decision',
+        body: 'Adoptar una base de datos local de prefijos BIN (como MaxMind o similar) para resolver el país del emisor de forma offline y rápida.',
+        source: 'ai_extracted',
+        confidence: 0.88,
+        authorId: luis.id
+      },
+      {
+        initiativeId: iva.id,
+        sourceConversationId: conv1.id,
+        type: 'rule',
+        body: 'Si el emisor de la tarjeta es internacional, se aplica la tasa de IVA estándar del 19% por defecto.',
+        source: 'manual',
+        confidence: 1.0,
+        authorId: ana.id
+      }
+    ])
 
-  console.log('Inserting activity…')
-  await db.insert(initiativeActivity).values([
-    {
-      initiativeId: portal.id,
-      actorId: ana.id,
-      action: 'spec.approved',
-      detail: 'Aprobada la versión 2 de la especificación.'
-    },
-    {
-      initiativeId: portal.id,
-      actorId: luis.id,
-      action: 'initiative.delayed',
-      detail: 'Marcada como retrasada por dependencia externa.'
-    }
-  ])
+  console.log('Inserting requirements…')
+  const reqs = await db
+    .insert(requirements)
+    .values([
+      {
+        initiativeId: iva.id,
+        sourceConversationId: conv2.id,
+        title: 'Detector de BIN de tarjeta',
+        description: 'Implementar un módulo local para verificar el código BIN de la tarjeta bancaria de entrada y mapear su país de origen.',
+        priority: 'must',
+        status: 'refining',
+        createdById: luis.id
+      },
+      {
+        initiativeId: iva.id,
+        sourceConversationId: conv1.id,
+        title: 'Cálculo dinámico en checkout',
+        description: 'Integrar el cálculo de la tasa (10% vs 19%) dinámicamente en el frontend antes de la confirmación final de pago.',
+        priority: 'must',
+        status: 'draft',
+        createdById: marta.id
+      }
+    ])
+    .returning()
+  const req1 = first(reqs, 'requirement')
+
+  console.log('Inserting AI artifacts…')
+  await db
+    .insert(aiArtifacts)
+    .values([
+      {
+        initiativeId: iva.id,
+        sourceConversationId: conv1.id,
+        type: 'refinement_questions',
+        title: 'Preguntas de refinamiento sobre pasarela',
+        content: '### Preguntas Clave\n\n1. ¿Qué pasarelas de pago se soportarán en la primera fase?\n2. ¿Qué hacer si hay discrepancia entre la IP y la tarjeta?\n3. ¿Se requiere reporte de conciliación de impuestos?',
+        status: 'accepted',
+        createdById: ana.id
+      },
+      {
+        initiativeId: iva.id,
+        requirementId: req1.id,
+        type: 'technical_plan',
+        title: 'Plan de integración de cálculo dinámico',
+        content: '### Plan Técnico\n\n- **Checkout API**: Recibe BIN e IP.\n- **Cache**: Mapea BIN a país en Redis.\n- **Resultado**: Retorna desglose de tasa a aplicar.',
+        status: 'draft',
+        createdById: luis.id
+      }
+    ])
 
   console.log('Seed completed successfully.')
 }

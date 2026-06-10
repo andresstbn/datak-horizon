@@ -1,41 +1,60 @@
 <script setup lang="ts">
-// Collapsed icon rail. Navigation is placeholder-only at this foundation stage.
+// Collapsed icon rail. Only the roadmap exists today; the rest are flagged as
+// "coming soon" (disabled) so the buttons reflect what actually works.
 interface RailItem {
   icon: string
   label: string
-  to: string
+  to?: string
+  // Marks the active item by route prefix.
+  match?: (path: string) => boolean
 }
 
 const items: RailItem[] = [
-  { icon: 'i-lucide-list', label: 'Hoja de ruta', to: '/' },
-  { icon: 'i-lucide-layout-grid', label: 'Línea de tiempo', to: '/' },
-  { icon: 'i-lucide-clock', label: 'Actividad', to: '/' }
+  {
+    icon: 'i-lucide-list',
+    label: 'Hoja de ruta',
+    to: '/',
+    match: path => path === '/' || path.startsWith('/iniciativas')
+  },
+  {
+    icon: 'i-lucide-calendar-range',
+    label: 'Línea de tiempo',
+    to: '/timeline',
+    match: path => path === '/timeline'
+  },
+  { icon: 'i-lucide-clock', label: 'Actividad (próximamente)' }
 ]
 
 const route = useRoute()
+
+function isActive(item: RailItem): boolean {
+  return item.match?.(route.path) ?? false
+}
 </script>
 
 <template lang="pug">
 //- Arbitrary value w-[58px] must live in class="" (Pug selector chains
 //- cannot parse it). Keep all utility classes in class="" to stay safe.
 aside(class="flex w-[58px] shrink-0 flex-col items-center gap-2 border-r border-default bg-elevated py-3")
-  UButton(
-    v-for="item in items"
-    :key="item.label"
-    :to="item.to"
-    :icon="item.icon"
-    :aria-label="item.label"
-    :color="route.path === item.to ? 'primary' : 'neutral'"
-    :variant="route.path === item.to ? 'solid' : 'ghost'"
-    square
-  )
-
-  .mt-auto
+  UTooltip(v-for="item in items" :key="item.label" :text="item.label")
     UButton(
-      icon="i-lucide-settings"
-      aria-label="Ajustes"
-      color="neutral"
-      variant="ghost"
+      :to="item.to"
+      :icon="item.icon"
+      :aria-label="item.label"
+      :disabled="!item.to"
+      :color="isActive(item) ? 'primary' : 'neutral'"
+      :variant="isActive(item) ? 'solid' : 'ghost'"
       square
     )
+
+  .mt-auto
+    UTooltip(text="Ajustes (próximamente)")
+      UButton(
+        icon="i-lucide-settings"
+        aria-label="Ajustes (próximamente)"
+        color="neutral"
+        variant="ghost"
+        disabled
+        square
+      )
 </template>

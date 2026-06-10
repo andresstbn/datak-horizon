@@ -3,10 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "node .output/server/index.mjs",
+    "gcp-build": "",
     "build": "nuxt build",
     "dev": "nuxt dev",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
+    "postinstall": "nuxt prepare || true",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck",
     "test": "vitest",
