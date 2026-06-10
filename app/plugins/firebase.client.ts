@@ -1,5 +1,11 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
-import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth'
+import {
+  browserLocalPersistence,
+  getAuth,
+  GoogleAuthProvider,
+  setPersistence,
+  type Auth
+} from 'firebase/auth'
 
 /**
  * Client-only Firebase bootstrap. Initialises the Firebase app and auth from the
@@ -19,6 +25,10 @@ export default defineNuxtPlugin(() => {
     })
 
   const auth: Auth = getAuth(app)
+  // Persist the session across reloads (IndexedDB). Default for web, set
+  // explicitly so the login survives a refresh deterministically.
+  setPersistence(auth, browserLocalPersistence).catch(() => {})
+
   const googleProvider = new GoogleAuthProvider()
 
   return {

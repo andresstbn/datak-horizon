@@ -4,10 +4,7 @@ Plataforma interna de Datak: la **fuente única de verdad** para las iniciativas
 de producto e ingeniería. Centraliza necesidades, especificaciones vivas,
 decisiones (ADR), planificación y entrega.
 
-> Esta fase cubre **solo los cimientos técnicos**: base de datos, autenticación,
-> arquitectura por capas, desarrollo local, datos de ejemplo, tests y el shell de
-> la aplicación. Los flujos de negocio y la UI avanzada llegan en iteraciones
-> posteriores.
+> **Estado Actual**: Esta versión cuenta con el primer núcleo funcional (MVP) de refinamiento colaborativo y preparación para IA completamente operativo. Consulta la carpeta [docs/](file:///Users/daniel/Datak/datak-services/datak-horizon/docs/) para obtener información detallada del diseño y objetivos del sistema.
 
 ## Stack
 
@@ -120,14 +117,13 @@ pnpm test:unit       # solo unitarios (esquema, utilidad de auth)
 
 ## Datos del modelo
 
-Entidad central: **Initiative** (iniciativa). A su alrededor:
+La entidad central es la **Iniciativa** (`Initiative`), a la cual se asocia todo el conocimiento técnico y de negocio mediante la siguiente estructura de dominio:
 
-- **Specification** + **SpecificationVersion**: especificación viva con historial
-  de versiones y aprobaciones; la versión aprobada es la fuente de verdad.
-- **Decision**: registros tipo ADR (contexto, alternativas, decisión, razón,
-  consecuencias).
-- **Comment**: comentarios en hilo que pueden ser preguntas abiertas resolubles.
-- **InitiativeActivity**: feed de cambios recientes.
+- **Conversación** (`Conversation`): Hilo de discusión o chat (manual, importación de Slack/WhatsApp, grabaciones, etc.).
+- **Mensaje de Conversación** (`ConversationMessage`): Mensaje individual (soporta Markdown).
+- **Insight** (`Insight`): Reglas de negocio, supuestos, restricciones y decisiones críticas que sobreviven a la discusión.
+- **Requerimiento** (`Requirement`): Requerimientos refinados con prioridad (`must`, `should`, `could`, `wont`) y estado.
+- **Artefacto IA** (`AIArtifact`): Plantillas funcionales, planes técnicos y prompts de desarrollo en Markdown (generados o manuales).
 
 ## Renovate
 

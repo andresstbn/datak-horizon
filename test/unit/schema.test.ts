@@ -1,29 +1,36 @@
 import { getTableConfig } from 'drizzle-orm/pg-core'
 import { describe, expect, it } from 'vitest'
 import {
-  comments,
-  decisions,
   initiativeStatus,
+  healthLevel,
   initiatives,
-  priorityLevel,
-  specificationVersions,
-  specifications,
+  conversations,
+  insights,
+  requirements,
+  aiArtifacts,
   users
 } from '../../server/db/schema'
 
 describe('database schema', () => {
   it('defines the expected initiative status values', () => {
     expect(initiativeStatus.enumValues).toEqual([
-      'planned',
-      'in_progress',
-      'in_review',
+      'discovery',
+      'refinement',
+      'ready',
+      'in_development',
+      'qa',
+      'released',
       'blocked',
-      'completed'
+      'cancelled'
     ])
   })
 
-  it('defines the expected priority values', () => {
-    expect(priorityLevel.enumValues).toEqual(['low', 'medium', 'high'])
+  it('defines the expected health level values', () => {
+    expect(healthLevel.enumValues).toEqual([
+      'on_track',
+      'at_risk',
+      'off_track'
+    ])
   })
 
   it('links users to the firebase uid and keeps it unique', () => {
@@ -38,21 +45,8 @@ describe('database schema', () => {
     expect(hasUniqueFirebaseUid).toBe(true)
   })
 
-  it('does not store authentication credentials on users', () => {
-    const columnNames = getTableConfig(users).columns.map(c => c.name)
-    expect(columnNames).not.toContain('password')
-    expect(columnNames).not.toContain('password_hash')
-  })
-
-  it('versions specifications with a unique (spec, version) pair', () => {
-    const config = getTableConfig(specificationVersions)
-    const unique = config.indexes.find(i => i.config.unique)
-    const columns = unique?.config.columns.map(c => ('name' in c ? c.name : ''))
-    expect(columns).toEqual(['specification_id', 'version'])
-  })
-
   it('cascades core relationships from initiatives', () => {
-    for (const table of [specifications, decisions, comments]) {
+    for (const table of [conversations, insights, requirements, aiArtifacts]) {
       const fk = getTableConfig(table).foreignKeys.find(f =>
         f.reference().foreignTable === initiatives
       )

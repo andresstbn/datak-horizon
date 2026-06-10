@@ -27,5 +27,10 @@ export const userRepository = {
     const db = getDb()
     const [row] = await db.insert(users).values(data).returning()
     return row!
+  },
+
+  async listAll(): Promise<User[]> {
+    const db = getDb()
+    return db.select().from(users).orderBy(users.displayName)
   }
 }

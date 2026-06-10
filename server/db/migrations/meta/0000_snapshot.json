@@ -1,11 +1,11 @@
 {
-  "id": "38a02ab3-742b-4ef1-8484-f96949d60d42",
+  "id": "26d59762-1e4b-420a-82d7-edd703a0481c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.comments": {
-      "name": "comments",
+    "public.ai_artifacts": {
+      "name": "ai_artifacts",
       "schema": "",
       "columns": {
         "id": {
@@ -21,47 +21,60 @@
           "primaryKey": false,
           "notNull": true
         },
-        "parent_id": {
-          "name": "parent_id",
+        "requirement_id": {
+          "name": "requirement_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "author_id": {
-          "name": "author_id",
+        "source_conversation_id": {
+          "name": "source_conversation_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "body": {
-          "name": "body",
+        "type": {
+          "name": "type",
+          "type": "artifact_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "is_question": {
-          "name": "is_question",
-          "type": "boolean",
+        "content": {
+          "name": "content",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": false
+          "notNull": true
         },
-        "is_resolved": {
-          "name": "is_resolved",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "resolved_by_id": {
-          "name": "resolved_by_id",
-          "type": "uuid",
+        "prompt_used": {
+          "name": "prompt_used",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "resolved_at": {
-          "name": "resolved_at",
-          "type": "timestamp with time zone",
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "artifact_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -81,8 +94,8 @@
         }
       },
       "indexes": {
-        "comments_initiative_idx": {
-          "name": "comments_initiative_idx",
+        "artifacts_initiative_idx": {
+          "name": "artifacts_initiative_idx",
           "columns": [
             {
               "expression": "initiative_id",
@@ -98,9 +111,9 @@
         }
       },
       "foreignKeys": {
-        "comments_initiative_id_initiatives_id_fk": {
-          "name": "comments_initiative_id_initiatives_id_fk",
-          "tableFrom": "comments",
+        "ai_artifacts_initiative_id_initiatives_id_fk": {
+          "name": "ai_artifacts_initiative_id_initiatives_id_fk",
+          "tableFrom": "ai_artifacts",
           "tableTo": "initiatives",
           "columnsFrom": [
             "initiative_id"
@@ -111,12 +124,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "comments_author_id_users_id_fk": {
-          "name": "comments_author_id_users_id_fk",
-          "tableFrom": "comments",
-          "tableTo": "users",
+        "ai_artifacts_requirement_id_requirements_id_fk": {
+          "name": "ai_artifacts_requirement_id_requirements_id_fk",
+          "tableFrom": "ai_artifacts",
+          "tableTo": "requirements",
           "columnsFrom": [
-            "author_id"
+            "requirement_id"
           ],
           "columnsTo": [
             "id"
@@ -124,12 +137,25 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "comments_resolved_by_id_users_id_fk": {
-          "name": "comments_resolved_by_id_users_id_fk",
-          "tableFrom": "comments",
+        "ai_artifacts_source_conversation_id_conversations_id_fk": {
+          "name": "ai_artifacts_source_conversation_id_conversations_id_fk",
+          "tableFrom": "ai_artifacts",
+          "tableTo": "conversations",
+          "columnsFrom": [
+            "source_conversation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "ai_artifacts_created_by_id_users_id_fk": {
+          "name": "ai_artifacts_created_by_id_users_id_fk",
+          "tableFrom": "ai_artifacts",
           "tableTo": "users",
           "columnsFrom": [
-            "resolved_by_id"
+            "created_by_id"
           ],
           "columnsTo": [
             "id"
@@ -144,8 +170,137 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.decisions": {
-      "name": "decisions",
+    "public.conversation_messages": {
+      "name": "conversation_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "conversation_id": {
+          "name": "conversation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "message_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "message_content_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'markdown'"
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "audio_url": {
+          "name": "audio_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transcription": {
+          "name": "transcription",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "media_url": {
+          "name": "media_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "messages_conversation_idx": {
+          "name": "messages_conversation_idx",
+          "columns": [
+            {
+              "expression": "conversation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "conversation_messages_conversation_id_conversations_id_fk": {
+          "name": "conversation_messages_conversation_id_conversations_id_fk",
+          "tableFrom": "conversation_messages",
+          "tableTo": "conversations",
+          "columnsFrom": [
+            "conversation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "conversation_messages_author_id_users_id_fk": {
+          "name": "conversation_messages_author_id_users_id_fk",
+          "tableFrom": "conversation_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.conversations": {
+      "name": "conversations",
       "schema": "",
       "columns": {
         "id": {
@@ -167,46 +322,16 @@
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
-          "type": "decision_status",
+        "source": {
+          "name": "source",
+          "type": "conversation_source",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'proposed'"
+          "default": "'manual'"
         },
-        "context": {
-          "name": "context",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "alternatives": {
-          "name": "alternatives",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decision": {
-          "name": "decision",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rationale": {
-          "name": "rationale",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "consequences": {
-          "name": "consequences",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "author_id": {
-          "name": "author_id",
+        "created_by_id": {
+          "name": "created_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -226,87 +351,9 @@
           "default": "now()"
         }
       },
-      "indexes": {},
-      "foreignKeys": {
-        "decisions_initiative_id_initiatives_id_fk": {
-          "name": "decisions_initiative_id_initiatives_id_fk",
-          "tableFrom": "decisions",
-          "tableTo": "initiatives",
-          "columnsFrom": [
-            "initiative_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "decisions_author_id_users_id_fk": {
-          "name": "decisions_author_id_users_id_fk",
-          "tableFrom": "decisions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.initiative_activity": {
-      "name": "initiative_activity",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "initiative_id": {
-          "name": "initiative_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actor_id": {
-          "name": "actor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "action": {
-          "name": "action",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "detail": {
-          "name": "detail",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
       "indexes": {
-        "initiative_activity_initiative_idx": {
-          "name": "initiative_activity_initiative_idx",
+        "conversations_initiative_idx": {
+          "name": "conversations_initiative_idx",
           "columns": [
             {
               "expression": "initiative_id",
@@ -322,9 +369,9 @@
         }
       },
       "foreignKeys": {
-        "initiative_activity_initiative_id_initiatives_id_fk": {
-          "name": "initiative_activity_initiative_id_initiatives_id_fk",
-          "tableFrom": "initiative_activity",
+        "conversations_initiative_id_initiatives_id_fk": {
+          "name": "conversations_initiative_id_initiatives_id_fk",
+          "tableFrom": "conversations",
           "tableTo": "initiatives",
           "columnsFrom": [
             "initiative_id"
@@ -335,12 +382,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "initiative_activity_actor_id_users_id_fk": {
-          "name": "initiative_activity_actor_id_users_id_fk",
-          "tableFrom": "initiative_activity",
+        "conversations_created_by_id_users_id_fk": {
+          "name": "conversations_created_by_id_users_id_fk",
+          "tableFrom": "conversations",
           "tableTo": "users",
           "columnsFrom": [
-            "actor_id"
+            "created_by_id"
           ],
           "columnsTo": [
             "id"
@@ -390,7 +437,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'planned'"
+          "default": "'discovery'"
         },
         "priority": {
           "name": "priority",
@@ -407,6 +454,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'low'"
+        },
+        "health": {
+          "name": "health",
+          "type": "health_level",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'on_track'"
         },
         "functional_owner_id": {
           "name": "functional_owner_id",
@@ -438,16 +493,15 @@
           "primaryKey": false,
           "notNull": false
         },
-        "is_delayed": {
-          "name": "is_delayed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "delay_reason": {
           "name": "delay_reason",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -551,155 +605,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.specification_versions": {
-      "name": "specification_versions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "specification_id": {
-          "name": "specification_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "spec_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'draft'"
-        },
-        "sections": {
-          "name": "sections",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "summary": {
-          "name": "summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "author_id": {
-          "name": "author_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_by_id": {
-          "name": "approved_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_at": {
-          "name": "approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "spec_versions_unique_idx": {
-          "name": "spec_versions_unique_idx",
-          "columns": [
-            {
-              "expression": "specification_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "version",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "specification_versions_specification_id_specifications_id_fk": {
-          "name": "specification_versions_specification_id_specifications_id_fk",
-          "tableFrom": "specification_versions",
-          "tableTo": "specifications",
-          "columnsFrom": [
-            "specification_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "specification_versions_author_id_users_id_fk": {
-          "name": "specification_versions_author_id_users_id_fk",
-          "tableFrom": "specification_versions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "specification_versions_approved_by_id_users_id_fk": {
-          "name": "specification_versions_approved_by_id_users_id_fk",
-          "tableFrom": "specification_versions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "approved_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.specifications": {
-      "name": "specifications",
+    "public.insights": {
+      "name": "insights",
       "schema": "",
       "columns": {
         "id": {
@@ -715,8 +622,41 @@
           "primaryKey": false,
           "notNull": true
         },
-        "current_version_id": {
-          "name": "current_version_id",
+        "source_conversation_id": {
+          "name": "source_conversation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "insight_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "insight_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "author_id": {
+          "name": "author_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -737,8 +677,8 @@
         }
       },
       "indexes": {
-        "specifications_initiative_idx": {
-          "name": "specifications_initiative_idx",
+        "insights_initiative_idx": {
+          "name": "insights_initiative_idx",
           "columns": [
             {
               "expression": "initiative_id",
@@ -747,16 +687,16 @@
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
         }
       },
       "foreignKeys": {
-        "specifications_initiative_id_initiatives_id_fk": {
-          "name": "specifications_initiative_id_initiatives_id_fk",
-          "tableFrom": "specifications",
+        "insights_initiative_id_initiatives_id_fk": {
+          "name": "insights_initiative_id_initiatives_id_fk",
+          "tableFrom": "insights",
           "tableTo": "initiatives",
           "columnsFrom": [
             "initiative_id"
@@ -765,6 +705,168 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "insights_source_conversation_id_conversations_id_fk": {
+          "name": "insights_source_conversation_id_conversations_id_fk",
+          "tableFrom": "insights",
+          "tableTo": "conversations",
+          "columnsFrom": [
+            "source_conversation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "insights_author_id_users_id_fk": {
+          "name": "insights_author_id_users_id_fk",
+          "tableFrom": "insights",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.requirements": {
+      "name": "requirements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "initiative_id": {
+          "name": "initiative_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_conversation_id": {
+          "name": "source_conversation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "priority": {
+          "name": "priority",
+          "type": "requirement_priority",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'must'"
+        },
+        "status": {
+          "name": "status",
+          "type": "requirement_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "requirements_initiative_idx": {
+          "name": "requirements_initiative_idx",
+          "columns": [
+            {
+              "expression": "initiative_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "requirements_initiative_id_initiatives_id_fk": {
+          "name": "requirements_initiative_id_initiatives_id_fk",
+          "tableFrom": "requirements",
+          "tableTo": "initiatives",
+          "columnsFrom": [
+            "initiative_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "requirements_source_conversation_id_conversations_id_fk": {
+          "name": "requirements_source_conversation_id_conversations_id_fk",
+          "tableFrom": "requirements",
+          "tableTo": "conversations",
+          "columnsFrom": [
+            "source_conversation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "requirements_created_by_id_users_id_fk": {
+          "name": "requirements_created_by_id_users_id_fk",
+          "tableFrom": "requirements",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -873,25 +975,99 @@
     }
   },
   "enums": {
-    "public.decision_status": {
-      "name": "decision_status",
+    "public.artifact_status": {
+      "name": "artifact_status",
       "schema": "public",
       "values": [
-        "proposed",
+        "draft",
         "accepted",
-        "superseded",
-        "deprecated"
+        "archived"
+      ]
+    },
+    "public.artifact_type": {
+      "name": "artifact_type",
+      "schema": "public",
+      "values": [
+        "refinement_questions",
+        "functional_specification",
+        "technical_plan",
+        "implementation_prompt",
+        "qa_checklist",
+        "consolidated_context"
+      ]
+    },
+    "public.conversation_source": {
+      "name": "conversation_source",
+      "schema": "public",
+      "values": [
+        "manual",
+        "whatsapp_import",
+        "slack_import",
+        "voice",
+        "meeting"
+      ]
+    },
+    "public.health_level": {
+      "name": "health_level",
+      "schema": "public",
+      "values": [
+        "on_track",
+        "at_risk",
+        "off_track"
       ]
     },
     "public.initiative_status": {
       "name": "initiative_status",
       "schema": "public",
       "values": [
-        "planned",
-        "in_progress",
-        "in_review",
+        "discovery",
+        "refinement",
+        "ready",
+        "in_development",
+        "qa",
+        "released",
         "blocked",
-        "completed"
+        "cancelled"
+      ]
+    },
+    "public.insight_source": {
+      "name": "insight_source",
+      "schema": "public",
+      "values": [
+        "manual",
+        "ai_extracted"
+      ]
+    },
+    "public.insight_type": {
+      "name": "insight_type",
+      "schema": "public",
+      "values": [
+        "constraint",
+        "dependency",
+        "decision",
+        "rule",
+        "assumption",
+        "risk"
+      ]
+    },
+    "public.message_content_type": {
+      "name": "message_content_type",
+      "schema": "public",
+      "values": [
+        "markdown",
+        "text",
+        "audio",
+        "image",
+        "document"
+      ]
+    },
+    "public.message_role": {
+      "name": "message_role",
+      "schema": "public",
+      "values": [
+        "user",
+        "assistant",
+        "system"
       ]
     },
     "public.priority_level": {
@@ -903,6 +1079,27 @@
         "high"
       ]
     },
+    "public.requirement_priority": {
+      "name": "requirement_priority",
+      "schema": "public",
+      "values": [
+        "must",
+        "should",
+        "could",
+        "wont"
+      ]
+    },
+    "public.requirement_status": {
+      "name": "requirement_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "refining",
+        "ready",
+        "implemented",
+        "archived"
+      ]
+    },
     "public.risk_level": {
       "name": "risk_level",
       "schema": "public",
@@ -910,16 +1107,6 @@
         "low",
         "medium",
         "high"
-      ]
-    },
-    "public.spec_status": {
-      "name": "spec_status",
-      "schema": "public",
-      "values": [
-        "draft",
-        "in_review",
-        "approved",
-        "archived"
       ]
     },
     "public.user_role": {

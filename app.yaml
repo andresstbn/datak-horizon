@@ -1,0 +1,32 @@
+runtime: nodejs22
+service: horizon
+
+automatic_scaling:
+  max_instances: 5
+
+handlers:
+  - url: /_nuxt
+    static_dir: .output/public/_nuxt
+    secure: always
+
+  - url: /img
+    static_dir: .output/public/img
+    secure: always
+
+  - url: /.*
+    script: auto
+    secure: always
+
+service_account: horizon-sa@datak-production.iam.gserviceaccount.com
+
+env_variables:
+  ENV: PRODUCTION
+  # Reemplaza <PASSWORD> con la contraseña generada por el script scripts/setup_gcp_resources.sh
+  DATABASE_URL: "postgresql://horizon_app_user:uqYx8TfyVovuoZxjfZTF@%2Fcloudsql%2Fdatak-production:us-central1:instance-db-main/datak_horizon"
+  NUXT_PUBLIC_FIREBASE_API_KEY: AIzaSyC7ROaqdYOhTcMJ0Vk_Xy3z1i4mwJ_h6Rs
+  NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN: datak-production.firebaseapp.com
+  NUXT_PUBLIC_FIREBASE_PROJECT_ID: datak-production
+  NUXT_PUBLIC_FIREBASE_APP_ID: 1:585446102303:web:b8ed150ad157cd0c584c2a
+
+build_env_variables:
+  GOOGLE_NODE_RUN_SCRIPTS: ""

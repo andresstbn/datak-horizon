@@ -2,14 +2,13 @@ import { relations } from 'drizzle-orm'
 import {
   boolean,
   index,
-  integer,
-  jsonb,
   pgEnum,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
-  uuid
+  uuid,
+  doublePrecision
 } from 'drizzle-orm/pg-core'
 
 // ---------------------------------------------------------------------------
@@ -19,29 +18,79 @@ import {
 export const userRole = pgEnum('user_role', ['admin', 'member', 'viewer'])
 
 export const initiativeStatus = pgEnum('initiative_status', [
-  'planned',
-  'in_progress',
-  'in_review',
+  'discovery',
+  'refinement',
+  'ready',
+  'in_development',
+  'qa',
+  'released',
   'blocked',
-  'completed'
+  'cancelled'
 ])
 
 export const priorityLevel = pgEnum('priority_level', ['low', 'medium', 'high'])
 
 export const riskLevel = pgEnum('risk_level', ['low', 'medium', 'high'])
 
-export const specStatus = pgEnum('spec_status', [
+export const healthLevel = pgEnum('health_level', ['on_track', 'at_risk', 'off_track'])
+
+export const conversationSource = pgEnum('conversation_source', [
+  'manual',
+  'whatsapp_import',
+  'slack_import',
+  'voice',
+  'meeting'
+])
+
+export const messageRole = pgEnum('message_role', ['user', 'assistant', 'system'])
+
+export const messageContentType = pgEnum('message_content_type', [
+  'markdown',
+  'text',
+  'audio',
+  'image',
+  'document'
+])
+
+export const insightType = pgEnum('insight_type', [
+  'constraint',
+  'dependency',
+  'decision',
+  'rule',
+  'assumption',
+  'risk'
+])
+
+export const insightSource = pgEnum('insight_source', ['manual', 'ai_extracted'])
+
+export const requirementPriority = pgEnum('requirement_priority', [
+  'must',
+  'should',
+  'could',
+  'wont'
+])
+
+export const requirementStatus = pgEnum('requirement_status', [
   'draft',
-  'in_review',
-  'approved',
+  'refining',
+  'ready',
+  'implemented',
   'archived'
 ])
 
-export const decisionStatus = pgEnum('decision_status', [
-  'proposed',
+export const artifactType = pgEnum('artifact_type', [
+  'refinement_questions',
+  'functional_specification',
+  'technical_plan',
+  'implementation_prompt',
+  'qa_checklist',
+  'consolidated_context'
+])
+
+export const artifactStatus = pgEnum('artifact_status', [
+  'draft',
   'accepted',
-  'superseded',
-  'deprecated'
+  'archived'
 ])
 
 // ---------------------------------------------------------------------------
@@ -86,9 +135,10 @@ export const initiatives = pgTable(
     title: text('title').notNull(),
     slug: text('slug').notNull(),
     description: text('description'),
-    status: initiativeStatus('status').default('planned').notNull(),
+    status: initiativeStatus('status').default('discovery').notNull(),
     priority: priorityLevel('priority').default('medium').notNull(),
     risk: riskLevel('risk').default('low').notNull(),
+    health: healthLevel('health').default('on_track').notNull(),
     functionalOwnerId: uuid('functional_owner_id').references(() => users.id, {
       onDelete: 'set null'
     }),
@@ -98,8 +148,8 @@ export const initiatives = pgTable(
     targetDate: timestamp('target_date', { withTimezone: true }),
     committedDate: timestamp('committed_date', { withTimezone: true }),
     estimatedDate: timestamp('estimated_date', { withTimezone: true }),
-    isDelayed: boolean('is_delayed').default(false).notNull(),
     delayReason: text('delay_reason'),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdById: uuid('created_by_id').references(() => users.id, {
       onDelete: 'set null'
     }),
@@ -112,110 +162,132 @@ export const initiatives = pgTable(
 )
 
 // ---------------------------------------------------------------------------
-// Living specification — one specification per initiative with versions.
+// Conversations — where knowledge starts.
 // ---------------------------------------------------------------------------
 
-export const specifications = pgTable(
-  'specifications',
+export const conversations = pgTable(
+  'conversations',
   {
     id: uuid('id').defaultRandom().primaryKey(),
     initiativeId: uuid('initiative_id')
       .notNull()
       .references(() => initiatives.id, { onDelete: 'cascade' }),
-    // The current approved version is the source of truth (nullable until approved).
-    currentVersionId: uuid('current_version_id'),
-    ...timestamps
-  },
-  table => [uniqueIndex('specifications_initiative_idx').on(table.initiativeId)]
-)
-
-export const specificationVersions = pgTable(
-  'specification_versions',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    specificationId: uuid('specification_id')
-      .notNull()
-      .references(() => specifications.id, { onDelete: 'cascade' }),
-    version: integer('version').notNull(),
-    status: specStatus('status').default('draft').notNull(),
-    // Structured sections (contexto, problema, objetivo, alcance, …).
-    sections: jsonb('sections').$type<Record<string, string>>().default({}).notNull(),
-    summary: text('summary'),
-    authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
-    approvedById: uuid('approved_by_id').references(() => users.id, {
+    title: text('title').notNull(),
+    source: conversationSource('source').default('manual').notNull(),
+    createdById: uuid('created_by_id').references(() => users.id, {
       onDelete: 'set null'
     }),
-    approvedAt: timestamp('approved_at', { withTimezone: true }),
     ...timestamps
   },
-  table => [
-    uniqueIndex('spec_versions_unique_idx').on(table.specificationId, table.version)
-  ]
+  table => [index('conversations_initiative_idx').on(table.initiativeId)]
 )
 
 // ---------------------------------------------------------------------------
-// Decisions — ADR-inspired records.
+// ConversationMessage — messages within a conversation (supports markdown).
 // ---------------------------------------------------------------------------
 
-export const decisions = pgTable('decisions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  initiativeId: uuid('initiative_id')
-    .notNull()
-    .references(() => initiatives.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  status: decisionStatus('status').default('proposed').notNull(),
-  context: text('context'),
-  alternatives: text('alternatives'),
-  decision: text('decision'),
-  rationale: text('rationale'),
-  consequences: text('consequences'),
-  authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
-  ...timestamps
-})
-
-// ---------------------------------------------------------------------------
-// Comments — threaded, can represent open questions.
-// ---------------------------------------------------------------------------
-
-export const comments = pgTable(
-  'comments',
+export const conversationMessages = pgTable(
+  'conversation_messages',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    initiativeId: uuid('initiative_id')
+    conversationId: uuid('conversation_id')
       .notNull()
-      .references(() => initiatives.id, { onDelete: 'cascade' }),
-    // Self reference enables threaded replies.
-    parentId: uuid('parent_id'),
-    authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    authorId: uuid('author_id').references(() => users.id, {
+      onDelete: 'set null'
+    }),
+    role: messageRole('role').default('user').notNull(),
+    contentType: messageContentType('content_type').default('markdown').notNull(),
     body: text('body').notNull(),
-    isQuestion: boolean('is_question').default(false).notNull(),
-    isResolved: boolean('is_resolved').default(false).notNull(),
-    resolvedById: uuid('resolved_by_id').references(() => users.id, {
-      onDelete: 'set null'
-    }),
-    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    audioUrl: text('audio_url'),
+    transcription: text('transcription'),
+    mediaUrl: text('media_url'),
     ...timestamps
   },
-  table => [index('comments_initiative_idx').on(table.initiativeId)]
+  table => [index('messages_conversation_idx').on(table.conversationId)]
 )
 
 // ---------------------------------------------------------------------------
-// Activity feed — recent changes shown on the initiative detail.
+// Insight — persistent knowledge extracted from discussions.
 // ---------------------------------------------------------------------------
 
-export const initiativeActivity = pgTable(
-  'initiative_activity',
+export const insights = pgTable(
+  'insights',
   {
     id: uuid('id').defaultRandom().primaryKey(),
     initiativeId: uuid('initiative_id')
       .notNull()
       .references(() => initiatives.id, { onDelete: 'cascade' }),
-    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
-    action: text('action').notNull(),
-    detail: text('detail'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+    sourceConversationId: uuid('source_conversation_id').references(() => conversations.id, {
+      onDelete: 'set null'
+    }),
+    type: insightType('type').notNull(),
+    body: text('body').notNull(),
+    source: insightSource('source').default('manual').notNull(),
+    confidence: doublePrecision('confidence'),
+    authorId: uuid('author_id').references(() => users.id, {
+      onDelete: 'set null'
+    }),
+    ...timestamps
   },
-  table => [index('initiative_activity_initiative_idx').on(table.initiativeId)]
+  table => [index('insights_initiative_idx').on(table.initiativeId)]
+)
+
+// ---------------------------------------------------------------------------
+// Requirement — refined implementation items.
+// ---------------------------------------------------------------------------
+
+export const requirements = pgTable(
+  'requirements',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    initiativeId: uuid('initiative_id')
+      .notNull()
+      .references(() => initiatives.id, { onDelete: 'cascade' }),
+    sourceConversationId: uuid('source_conversation_id').references(() => conversations.id, {
+      onDelete: 'set null'
+    }),
+    title: text('title').notNull(),
+    description: text('description').notNull(),
+    priority: requirementPriority('priority').default('must').notNull(),
+    status: requirementStatus('status').default('draft').notNull(),
+    createdById: uuid('created_by_id').references(() => users.id, {
+      onDelete: 'set null'
+    }),
+    ...timestamps
+  },
+  table => [index('requirements_initiative_idx').on(table.initiativeId)]
+)
+
+// ---------------------------------------------------------------------------
+// AIArtifact — generated specs/plans (can also be created manually).
+// ---------------------------------------------------------------------------
+
+export const aiArtifacts = pgTable(
+  'ai_artifacts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    initiativeId: uuid('initiative_id')
+      .notNull()
+      .references(() => initiatives.id, { onDelete: 'cascade' }),
+    requirementId: uuid('requirement_id').references(() => requirements.id, {
+      onDelete: 'set null'
+    }),
+    sourceConversationId: uuid('source_conversation_id').references(() => conversations.id, {
+      onDelete: 'set null'
+    }),
+    type: artifactType('type').notNull(),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
+    promptUsed: text('prompt_used'),
+    model: text('model'),
+    status: artifactStatus('status').default('draft').notNull(),
+    createdById: uuid('created_by_id').references(() => users.id, {
+      onDelete: 'set null'
+    }),
+    ...timestamps
+  },
+  table => [index('artifacts_initiative_idx').on(table.initiativeId)]
 )
 
 // ---------------------------------------------------------------------------
@@ -242,57 +314,83 @@ export const initiativesRelations = relations(initiatives, ({ one, many }) => ({
     references: [users.id],
     relationName: 'createdBy'
   }),
-  specification: one(specifications, {
-    fields: [initiatives.id],
-    references: [specifications.initiativeId]
-  }),
-  decisions: many(decisions),
-  comments: many(comments),
-  activity: many(initiativeActivity)
+  conversations: many(conversations),
+  insights: many(insights),
+  requirements: many(requirements),
+  aiArtifacts: many(aiArtifacts)
 }))
 
-export const specificationsRelations = relations(specifications, ({ one, many }) => ({
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
   initiative: one(initiatives, {
-    fields: [specifications.initiativeId],
+    fields: [conversations.initiativeId],
     references: [initiatives.id]
   }),
-  versions: many(specificationVersions)
+  createdBy: one(users, {
+    fields: [conversations.createdById],
+    references: [users.id]
+  }),
+  messages: many(conversationMessages)
 }))
 
-export const specificationVersionsRelations = relations(
-  specificationVersions,
-  ({ one }) => ({
-    specification: one(specifications, {
-      fields: [specificationVersions.specificationId],
-      references: [specifications.id]
-    }),
-    author: one(users, {
-      fields: [specificationVersions.authorId],
-      references: [users.id]
-    })
+export const conversationMessagesRelations = relations(conversationMessages, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [conversationMessages.conversationId],
+    references: [conversations.id]
+  }),
+  author: one(users, {
+    fields: [conversationMessages.authorId],
+    references: [users.id]
   })
-)
-
-export const decisionsRelations = relations(decisions, ({ one }) => ({
-  initiative: one(initiatives, {
-    fields: [decisions.initiativeId],
-    references: [initiatives.id]
-  }),
-  author: one(users, { fields: [decisions.authorId], references: [users.id] })
 }))
 
-export const commentsRelations = relations(comments, ({ one, many }) => ({
+export const insightsRelations = relations(insights, ({ one }) => ({
   initiative: one(initiatives, {
-    fields: [comments.initiativeId],
+    fields: [insights.initiativeId],
     references: [initiatives.id]
   }),
-  author: one(users, { fields: [comments.authorId], references: [users.id] }),
-  parent: one(comments, {
-    fields: [comments.parentId],
-    references: [comments.id],
-    relationName: 'thread'
+  sourceConversation: one(conversations, {
+    fields: [insights.sourceConversationId],
+    references: [conversations.id]
   }),
-  replies: many(comments, { relationName: 'thread' })
+  author: one(users, {
+    fields: [insights.authorId],
+    references: [users.id]
+  })
+}))
+
+export const requirementsRelations = relations(requirements, ({ one, many }) => ({
+  initiative: one(initiatives, {
+    fields: [requirements.initiativeId],
+    references: [initiatives.id]
+  }),
+  sourceConversation: one(conversations, {
+    fields: [requirements.sourceConversationId],
+    references: [conversations.id]
+  }),
+  createdBy: one(users, {
+    fields: [requirements.createdById],
+    references: [users.id]
+  }),
+  aiArtifacts: many(aiArtifacts)
+}))
+
+export const aiArtifactsRelations = relations(aiArtifacts, ({ one }) => ({
+  initiative: one(initiatives, {
+    fields: [aiArtifacts.initiativeId],
+    references: [initiatives.id]
+  }),
+  requirement: one(requirements, {
+    fields: [aiArtifacts.requirementId],
+    references: [requirements.id]
+  }),
+  sourceConversation: one(conversations, {
+    fields: [aiArtifacts.sourceConversationId],
+    references: [conversations.id]
+  }),
+  createdBy: one(users, {
+    fields: [aiArtifacts.createdById],
+    references: [users.id]
+  })
 }))
 
 // ---------------------------------------------------------------------------
@@ -301,9 +399,21 @@ export const commentsRelations = relations(comments, ({ one, many }) => ({
 
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
+
 export type Initiative = typeof initiatives.$inferSelect
 export type NewInitiative = typeof initiatives.$inferInsert
-export type Specification = typeof specifications.$inferSelect
-export type SpecificationVersion = typeof specificationVersions.$inferSelect
-export type Decision = typeof decisions.$inferSelect
-export type Comment = typeof comments.$inferSelect
+
+export type Conversation = typeof conversations.$inferSelect
+export type NewConversation = typeof conversations.$inferInsert
+
+export type ConversationMessage = typeof conversationMessages.$inferSelect
+export type NewConversationMessage = typeof conversationMessages.$inferInsert
+
+export type Insight = typeof insights.$inferSelect
+export type NewInsight = typeof insights.$inferInsert
+
+export type Requirement = typeof requirements.$inferSelect
+export type NewRequirement = typeof requirements.$inferInsert
+
+export type AIArtifact = typeof aiArtifacts.$inferSelect
+export type NewAIArtifact = typeof aiArtifacts.$inferInsert

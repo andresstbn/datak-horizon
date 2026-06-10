@@ -7,22 +7,4 @@
  */
 @theme static {
   --font-sans: 'Public Sans', sans-serif;
-
-  /* Clay accent scale (primary). */
-  --color-clay-50: #F7EFE8;
-  --color-clay-100: #EFE3D8;
-  --color-clay-200: #E2CDBC;
-  --color-clay-300: #CBA98E;
-  --color-clay-400: #B38A6C;
-  --color-clay-500: #9C6B4E;
-  --color-clay-600: #875A40;
-  --color-clay-700: #6F4A34;
-  --color-clay-800: #573A29;
-  --color-clay-900: #3F2A1E;
-  --color-clay-950: #241710;
-
-  /* Warm neutral surfaces. */
-  --color-app: #FAF8F3;
-  --color-beige: #F3EFE6;
-  --color-beige-2: #ECE6D9;
 }

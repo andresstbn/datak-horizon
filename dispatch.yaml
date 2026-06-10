@@ -1,0 +1,24 @@
+dispatch:
+  - url: "datak.co/*"
+    service: default
+
+  - url: "app.ocimec.com.co/*"
+    service: ocimec-frontend
+
+  - url: "ocimec.com.co/*"
+    service: ocimec-frontend
+
+  - url: "app.datak.co/*"
+    service: app
+
+  - url: "app.dev.datak.co/*"
+    service: app-dev
+
+  - url: "core.datak.co/*"
+    service: core
+
+  - url: "core.dev.datak.co/*"
+    service: core-dev
+
+  - url: "horizon.datak.co/*"
+    service: horizon
