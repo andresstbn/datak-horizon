@@ -1,12 +1,12 @@
 import type { OwnerRef } from './initiative'
 
-export type ArtifactType =
-  | 'refinement_questions'
-  | 'functional_specification'
-  | 'technical_plan'
-  | 'implementation_prompt'
-  | 'qa_checklist'
-  | 'consolidated_context'
+export type ArtifactType
+  = | 'refinement_questions'
+    | 'functional_specification'
+    | 'technical_plan'
+    | 'implementation_prompt'
+    | 'qa_checklist'
+    | 'consolidated_context'
 
 export type ArtifactStatus = 'draft' | 'accepted' | 'archived'
 

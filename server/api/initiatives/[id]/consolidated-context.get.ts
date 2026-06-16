@@ -13,7 +13,8 @@ export default defineEventHandler(async (event) => {
   try {
     const markdown = await consolidatedContextService.generateMarkdown(id)
     return { markdown }
-  } catch (error: any) {
-    throw createError({ statusCode: 404, statusMessage: error.message || 'Iniciativa no encontrada.' })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Iniciativa no encontrada.'
+    throw createError({ statusCode: 404, statusMessage: message })
   }
 })

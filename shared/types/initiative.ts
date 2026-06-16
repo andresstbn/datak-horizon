@@ -3,15 +3,15 @@
  * Must stay framework-agnostic (no Vue, no Nitro imports).
  */
 
-export type InitiativeStatus =
-  | 'discovery'
-  | 'refinement'
-  | 'ready'
-  | 'in_development'
-  | 'qa'
-  | 'released'
-  | 'blocked'
-  | 'cancelled'
+export type InitiativeStatus
+  = | 'discovery'
+    | 'refinement'
+    | 'ready'
+    | 'in_development'
+    | 'qa'
+    | 'released'
+    | 'blocked'
+    | 'cancelled'
 
 export type PriorityLevel = 'low' | 'medium' | 'high'
 export type RiskLevel = 'low' | 'medium' | 'high'

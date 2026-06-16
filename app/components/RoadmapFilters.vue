@@ -7,7 +7,6 @@ const props = defineProps<{
 
 const filters = defineModel<InitiativeFilters>({ required: true })
 
-
 const statusOptions = [
   { label: 'Todos los estados', value: ANY_OPTION },
   { label: 'Descubrimiento', value: 'discovery' },
@@ -63,5 +62,4 @@ const ownerOptions = computed(() => [
   USelect(v-model="filters.priority" :items="priorityOptions")
   USelect(v-model="filters.risk" :items="riskOptions")
   USelect(v-model="filters.ownerId" :items="ownerOptions")
-
 </template>

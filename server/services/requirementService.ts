@@ -79,7 +79,7 @@ export const requirementService = {
 
   async update(id: string, data: UpdateRequirementInput): Promise<Requirement> {
     const row = await requirementRepository.update(id, data)
-    
+
     const list = await requirementRepository.listByInitiative(row.initiativeId)
     const matched = list.find(r => r.id === row.id)
     if (!matched) {

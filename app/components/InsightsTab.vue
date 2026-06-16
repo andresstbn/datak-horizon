@@ -2,6 +2,7 @@
 import { useInsights } from '~/composables/useInsights'
 import { useConversations } from '~/composables/useConversations'
 import { formatRelativeTime } from '~~/shared/utils/initiatives'
+import type { InsightType } from '~~/shared/types/insight'
 
 const props = defineProps<{
   initiativeId: string
@@ -23,10 +24,15 @@ const {
 const createOpen = ref(false)
 const isSubmitting = ref(false)
 
-const newInsight = ref({
-  type: 'decision' as any,
+const newInsight = ref<{
+  type: InsightType
+  body: string
+  sourceConversationId: string | null
+  confidence: number
+}>({
+  type: 'decision',
   body: '',
-  sourceConversationId: null as string | null,
+  sourceConversationId: null,
   confidence: 1.0
 })
 
@@ -77,7 +83,7 @@ function renderMarkdown(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-  
+
   html = html.replace(/^### (.*$)/gim, '<h3 class="font-bold text-base mt-2 mb-1 text-foreground">$1</h3>')
   html = html.replace(/^## (.*$)/gim, '<h2 class="font-bold text-lg mt-3 mb-1 text-foreground">$1</h2>')
   html = html.replace(/^# (.*$)/gim, '<h1 class="font-bold text-xl mt-4 mb-2 text-foreground">$1</h1>')

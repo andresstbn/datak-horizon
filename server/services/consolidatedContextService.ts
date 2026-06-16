@@ -28,7 +28,7 @@ export const consolidatedContextService = {
     md += `- **Riesgo**: ${initiative.risk}\n`
     md += `- **Responsable Funcional**: ${initiative.functionalOwner?.displayName || initiative.functionalOwner?.email || 'No asignado'}\n`
     md += `- **Responsable Técnico**: ${initiative.technicalOwner?.displayName || initiative.technicalOwner?.email || 'No asignado'}\n`
-    
+
     const formatDate = (d: Date | null) => d ? d.toISOString().split('T')[0] : 'No definida'
     md += `- **Fecha Objetivo**: ${formatDate(initiative.targetDate)}\n`
     md += `- **Fecha Comprometida**: ${formatDate(initiative.committedDate)}\n`

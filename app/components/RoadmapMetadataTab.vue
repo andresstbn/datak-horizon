@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { initiativeService } from '~/services/initiativeService'
-import type { InitiativeDetail } from '~~/shared/types/initiative'
+import type { InitiativeDetail, OwnerRef } from '~~/shared/types/initiative'
 
 const props = defineProps<{
   initiative: InitiativeDetail
@@ -12,7 +12,7 @@ const emit = defineEmits<{
 
 const { getIdToken } = useAuth()
 const toast = useToast()
-const usersList = ref<any[]>([])
+const usersList = ref<OwnerRef[]>([])
 const isSubmitting = ref(false)
 
 const form = ref({

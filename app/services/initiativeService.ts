@@ -20,7 +20,7 @@ export const initiativeService = {
     })
   },
 
-  async create(idToken: string, data: { title: string; description: string | null }): Promise<InitiativeDetail> {
+  async create(idToken: string, data: { title: string, description: string | null }): Promise<InitiativeDetail> {
     return $fetch<InitiativeDetail>('/api/initiatives', {
       method: 'POST',
       headers: { Authorization: `Bearer ${idToken}` },

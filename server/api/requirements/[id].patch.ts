@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'El cuerpo de la solicitud no puede estar vacío.' })
   }
 
-  const payload: Record<string, any> = {}
+  const payload: Record<string, unknown> = {}
   if (body.title !== undefined) payload.title = body.title
   if (body.description !== undefined) payload.description = body.description
   if (body.priority !== undefined) payload.priority = body.priority

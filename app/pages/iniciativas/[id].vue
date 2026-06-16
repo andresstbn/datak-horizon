@@ -124,7 +124,7 @@ watch(
           :label="statusBadge(initiative.status).label"
           variant="subtle"
         )
-        
+
         .ml-auto
           UButton(
             icon="i-lucide-copy"
@@ -137,19 +137,19 @@ watch(
       UTabs(v-model="activeTab" :items="tabItems" variant="link" :ui="{ root: 'gap-4' }")
         template(#resumen)
           InitiativeSummary(:initiative="initiative")
-        
+
         template(#conversations)
           ConversationsTab(:initiative-id="id")
-        
+
         template(#requirements)
           RequirementsTab(:initiative-id="id")
-        
+
         template(#insights)
           InsightsTab(:initiative-id="id")
-        
+
         template(#artifacts)
           ArtifactsTab(:initiative-id="id")
-        
+
         template(#metadata)
           RoadmapMetadataTab(:initiative="initiative" @updated="fetchInitiative")
 </template>

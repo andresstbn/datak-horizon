@@ -1,5 +1,21 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+// Import the repositories so we can reference them in test mocks
+import { initiativeRepository } from '../../server/repositories/initiativeRepository'
+import { conversationRepository } from '../../server/repositories/conversationRepository'
+import { conversationMessageRepository } from '../../server/repositories/conversationMessageRepository'
+import { insightRepository } from '../../server/repositories/insightRepository'
+import { requirementRepository } from '../../server/repositories/requirementRepository'
+import { aiArtifactRepository } from '../../server/repositories/aiArtifactRepository'
+
+// Import services to test
+import { initiativeService } from '../../server/services/initiativeService'
+import { conversationService } from '../../server/services/conversationService'
+import { conversationMessageService } from '../../server/services/conversationMessageService'
+import { insightService } from '../../server/services/insightService'
+import { requirementService } from '../../server/services/requirementService'
+import { consolidatedContextService } from '../../server/services/consolidatedContextService'
+
 // Mock the repositories using inline factories to avoid Vitest hoisting errors
 vi.mock('../../server/repositories/initiativeRepository', () => ({
   initiativeRepository: {
@@ -51,22 +67,6 @@ vi.mock('../../server/repositories/aiArtifactRepository', () => ({
   }
 }))
 
-// Import the repositories so we can reference them in test mocks
-import { initiativeRepository } from '../../server/repositories/initiativeRepository'
-import { conversationRepository } from '../../server/repositories/conversationRepository'
-import { conversationMessageRepository } from '../../server/repositories/conversationMessageRepository'
-import { insightRepository } from '../../server/repositories/insightRepository'
-import { requirementRepository } from '../../server/repositories/requirementRepository'
-import { aiArtifactRepository } from '../../server/repositories/aiArtifactRepository'
-
-// Import services to test
-import { initiativeService } from '../../server/services/initiativeService'
-import { conversationService } from '../../server/services/conversationService'
-import { conversationMessageService } from '../../server/services/conversationMessageService'
-import { insightService } from '../../server/services/insightService'
-import { requirementService } from '../../server/services/requirementService'
-import { consolidatedContextService } from '../../server/services/consolidatedContextService'
-
 describe('Horizon Core Services', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -88,7 +88,7 @@ describe('Horizon Core Services', () => {
         estimatedDate: null,
         delayReason: null
       }
-      
+
       vi.mocked(initiativeRepository.create).mockResolvedValue({
         id: 'init-123',
         ...input,
@@ -110,7 +110,7 @@ describe('Horizon Core Services', () => {
       })
 
       const result = await initiativeService.create(input, 'user-abc')
-      
+
       expect(result.id).toBe('init-123')
       expect(initiativeRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -125,7 +125,7 @@ describe('Horizon Core Services', () => {
   describe('conversationService', () => {
     it('creates a conversation and formats timestamps', async () => {
       const input = { title: 'Dudas tributarias', source: 'manual' as const }
-      
+
       vi.mocked(conversationRepository.create).mockResolvedValue({
         id: 'conv-1',
         initiativeId: 'init-123',
@@ -397,7 +397,7 @@ describe('Horizon Core Services', () => {
       ])
 
       const markdown = await consolidatedContextService.generateMarkdown('init-123')
-      
+
       expect(markdown).toContain('# Contexto Consolidado: IVA diferencial')
       expect(markdown).toContain('## 📋 Resumen Ejecutivo')
       expect(markdown).toContain('IVA desc')

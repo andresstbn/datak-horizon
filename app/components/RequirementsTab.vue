@@ -2,6 +2,7 @@
 import { useRequirements } from '~/composables/useRequirements'
 import { useConversations } from '~/composables/useConversations'
 import { priorityBadge } from '~~/shared/utils/initiatives'
+import type { RequirementPriority, RequirementStatus } from '~~/shared/types/requirement'
 
 const props = defineProps<{
   initiativeId: string
@@ -24,11 +25,16 @@ const {
 const createOpen = ref(false)
 const isSubmitting = ref(false)
 
-const newReq = ref({
+const newReq = ref<{
+  title: string
+  description: string
+  priority: RequirementPriority
+  sourceConversationId: string | null
+}>({
   title: '',
   description: '',
-  priority: 'must' as any,
-  sourceConversationId: null as string | null
+  priority: 'must',
+  sourceConversationId: null
 })
 
 const priorityOptions = [
@@ -59,7 +65,7 @@ function getPriorityLabel(pri: string): string {
     case 'must': return 'Must'
     case 'should': return 'Should'
     case 'could': return 'Could'
-    case 'wont': return "Won't"
+    case 'wont': return 'Won\'t'
     default: return pri
   }
 }
@@ -92,7 +98,7 @@ function renderMarkdown(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-  
+
   html = html.replace(/^### (.*$)/gim, '<h3 class="font-bold text-base mt-2 mb-1 text-foreground">$1</h3>')
   html = html.replace(/^## (.*$)/gim, '<h2 class="font-bold text-lg mt-3 mb-1 text-foreground">$1</h2>')
   html = html.replace(/^# (.*$)/gim, '<h1 class="font-bold text-xl mt-4 mb-2 text-foreground">$1</h1>')
@@ -119,7 +125,7 @@ async function handleCreateReq() {
   }
 }
 
-async function handleStatusChange(reqId: string, status: any) {
+async function handleStatusChange(reqId: string, status: RequirementStatus) {
   await updateRequirementStatus(reqId, status)
 }
 
@@ -173,7 +179,7 @@ onMounted(() => {
             .min-w-0
               h4.font-bold.text-sm.truncate {{ req.title }}
               p.text-muted(class="text-[11px]" v-if="req.sourceConversationTitle")
-                | Conversación origen: 
+                | Conversación origen:
                 span.font-medium {{ req.sourceConversationTitle }}
             .flex.items-center.gap-2.shrink-0
               UBadge(
@@ -209,7 +215,7 @@ onMounted(() => {
             autofocus
             class="w-full"
           )
-        
+
         UFormField(label="Conversación de Origen" name="sourceConversationId")
           USelect(
             v-model="newReq.sourceConversationId"

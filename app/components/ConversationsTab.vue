@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useConversations } from '~/composables/useConversations'
 import { formatRelativeTime } from '~~/shared/utils/initiatives'
+import type { ConversationSource } from '~~/shared/types/conversation'
 
 const props = defineProps<{
   initiativeId: string
@@ -26,9 +27,12 @@ const currentConversation = computed(() => {
 const createOpen = ref(false)
 const isSubmitting = ref(false)
 const newMessageBody = ref('')
-const newConv = ref({
+const newConv = ref<{
+  title: string
+  source: ConversationSource
+}>({
   title: '',
-  source: 'manual' as any
+  source: 'manual'
 })
 
 const sourceOptions = [
@@ -57,7 +61,7 @@ function renderMarkdown(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-  
+
   html = html.replace(/^### (.*$)/gim, '<h3 class="font-bold text-base mt-2 mb-1 text-foreground">$1</h3>')
   html = html.replace(/^## (.*$)/gim, '<h2 class="font-bold text-lg mt-3 mb-1 text-foreground">$1</h2>')
   html = html.replace(/^# (.*$)/gim, '<h1 class="font-bold text-xl mt-4 mb-2 text-foreground">$1</h1>')
@@ -147,7 +151,7 @@ onMounted(fetchConversations)
     .flex-1.flex.flex-col.p-4.overflow-y-auto.space-y-4
       .flex.items-center.justify-center.h-full(v-if="isMessagesLoading")
         UIcon.size-6.animate-spin.text-muted(name="i-lucide-loader-circle")
-      
+
       template(v-else-if="selectedConversationId")
         p.text-xs.text-center.text-dimmed.my-2 Comienzo del hilo de refinamiento.
 
@@ -169,7 +173,7 @@ onMounted(fetchConversations)
             .text-sm.text-muted.mt-1.bg-default.p-3.rounded-lg.border.border-default(
               v-html="renderMarkdown(msg.body)"
             )
-      
+
       .flex.flex-col.items-center.justify-center.h-full.text-center.text-dimmed(v-else)
         UIcon.size-8.text-dimmed(name="i-lucide-message-square")
         p.text-sm.mt-2 Selecciona una conversación de la izquierda o crea una nueva para ver los mensajes.
@@ -201,7 +205,7 @@ onMounted(fetchConversations)
             autofocus
             class="w-full"
           )
-        
+
         UFormField(label="Origen de la Discusión" name="source")
           USelect(
             v-model="newConv.source"

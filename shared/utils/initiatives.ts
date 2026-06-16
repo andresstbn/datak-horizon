@@ -132,9 +132,9 @@ export function filterInitiatives(
       return false
     }
     if (filters.ownerId !== ANY_OPTION) {
-      const matchesOwner =
-        item.functionalOwner?.id === filters.ownerId ||
-        item.technicalOwner?.id === filters.ownerId
+      const matchesOwner
+        = item.functionalOwner?.id === filters.ownerId
+          || item.technicalOwner?.id === filters.ownerId
       if (!matchesOwner) {
         return false
       }

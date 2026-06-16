@@ -1,4 +1,4 @@
-import type { AIArtifact, CreateArtifactInput, UpdateArtifactInput } from '~~/shared/types/artifact'
+import type { AIArtifact, CreateArtifactInput } from '~~/shared/types/artifact'
 
 export const aiArtifactService = {
   async list(idToken: string, initiativeId: string): Promise<AIArtifact[]> {

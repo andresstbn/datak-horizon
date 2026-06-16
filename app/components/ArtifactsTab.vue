@@ -3,6 +3,7 @@ import { useAIArtifacts } from '~/composables/useAIArtifacts'
 import { useConversations } from '~/composables/useConversations'
 import { useRequirements } from '~/composables/useRequirements'
 import { formatRelativeTime } from '~~/shared/utils/initiatives'
+import type { AIArtifact, ArtifactType, ArtifactStatus } from '~~/shared/types/artifact'
 
 const props = defineProps<{
   initiativeId: string
@@ -22,16 +23,23 @@ const { requirements, fetchRequirements } = useRequirements(props.initiativeId)
 const createOpen = ref(false)
 const viewOpen = ref(false)
 const isSubmitting = ref(false)
-const selectedArtifact = ref<any>(null)
+const selectedArtifact = ref<AIArtifact | null>(null)
 const toast = useToast()
 
-const newArt = ref({
+const newArt = ref<{
+  title: string
+  type: ArtifactType
+  content: string
+  requirementId: string | null
+  sourceConversationId: string | null
+  status: ArtifactStatus
+}>({
   title: '',
-  type: 'functional_specification' as any,
+  type: 'functional_specification',
   content: '',
-  requirementId: null as string | null,
-  sourceConversationId: null as string | null,
-  status: 'draft' as any
+  requirementId: null,
+  sourceConversationId: null,
+  status: 'draft'
 })
 
 const typeOptions = [
@@ -101,7 +109,7 @@ function renderMarkdown(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-  
+
   html = html.replace(/^### (.*$)/gim, '<h3 class="font-bold text-base mt-3 mb-1 text-foreground">$1</h3>')
   html = html.replace(/^## (.*$)/gim, '<h2 class="font-bold text-lg mt-4 mb-2 text-foreground">$1</h2>')
   html = html.replace(/^# (.*$)/gim, '<h1 class="font-bold text-xl mt-5 mb-3 text-foreground">$1</h1>')
@@ -149,7 +157,7 @@ async function handleCreateArt() {
   }
 }
 
-function handleView(art: any) {
+function handleView(art: AIArtifact) {
   selectedArtifact.value = art
   viewOpen.value = true
 }
@@ -261,11 +269,11 @@ onMounted(() => {
             size="sm"
             @click="handleCopy"
           )
-        
+
         .flex-1.overflow-y-auto.p-4.bg-default.rounded-xl.border.border-default
           h4.text-xs.font-semibold.text-dimmed.mb-2 VISTA PREVIA RENDERIZADA
           .text-sm.text-muted.prose(class="dark:prose-invert" v-html="renderMarkdown(selectedArtifact.content)")
-          
+
           h4.text-xs.font-semibold.text-dimmed.mt-6.mb-2 CÓDIGO FUENTE MARKDOWN
           pre.p-3.bg-neutral-900.text-neutral-100.rounded-lg.text-xs.overflow-x-auto.whitespace-pre-wrap {{ selectedArtifact.content }}
 

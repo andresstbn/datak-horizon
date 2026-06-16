@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Conversation } from '~~/shared/types/conversation'
+import type { Requirement } from '~~/shared/types/requirement'
 import { statusBadge, healthBadge, priorityBadge } from '~~/shared/utils/initiatives'
 import { conversationService } from '~/services/conversationService'
 import { requirementService } from '~/services/requirementService'
@@ -28,8 +30,8 @@ const newInitiative = ref({
   description: ''
 })
 
-const recentConversations = ref<any[]>([])
-const refiningRequirements = ref<any[]>([])
+const recentConversations = ref<(Conversation & { initiativeTitle?: string })[]>([])
+const refiningRequirements = ref<(Requirement & { initiativeTitle?: string })[]>([])
 const isDashboardLoading = ref(false)
 const toast = useToast()
 
@@ -54,7 +56,7 @@ async function fetchDashboardData() {
 // Active initiatives helper
 const activeInitiatives = computed(() => {
   return initiativesList.value.filter(
-    (item) => !['released', 'cancelled'].includes(item.status)
+    item => !['released', 'cancelled'].includes(item.status)
   )
 })
 
@@ -85,7 +87,7 @@ async function handleCreate() {
     })
     createOpen.value = false
     newInitiative.value = { title: '', description: '' }
-    
+
     // Refresh lists
     await fetchInitiatives()
     await fetchDashboardData()
@@ -166,13 +168,13 @@ watch(
         UPageCard(title="Iniciativas Activas")
           template(#description)
             p.text-xs.text-muted Esfuerzos en curso (excluye completados/cancelados).
-          
+
           .space-y-4
             .flex.items-center.justify-center.py-8(v-if="isInitiativesLoading")
               UIcon.size-5.animate-spin.text-muted(name="i-lucide-loader-circle")
-            
+
             p.text-sm.text-dimmed(v-else-if="activeInitiatives.length === 0") Sin iniciativas activas.
-            
+
             ul.divide-y.divide-default(v-else)
               li.py-3(class="first:pt-0 last:pb-0" v-for="item in activeInitiatives" :key="item.id")
                 .flex.items-start.justify-between.gap-3
@@ -197,13 +199,13 @@ watch(
         UPageCard(title="Conversaciones Recientes")
           template(#description)
             p.text-xs.text-muted Los hilos de discusión más recientes.
-          
+
           .space-y-4
             .flex.items-center.justify-center.py-8(v-if="isDashboardLoading")
               UIcon.size-5.animate-spin.text-muted(name="i-lucide-loader-circle")
-            
+
             p.text-sm.text-dimmed(v-else-if="recentConversations.length === 0") Sin conversaciones registradas.
-            
+
             ul.divide-y.divide-default(v-else)
               li.py-3(class="first:pt-0 last:pb-0" v-for="conv in recentConversations" :key="conv.id")
                 .space-y-1
@@ -211,27 +213,27 @@ watch(
                     ULink.font-semibold.text-sm(class="hover:underline" :to="`/iniciativas/${conv.initiativeId}?tab=conversations`") {{ conv.title }}
                     UBadge(color="neutral" variant="subtle" size="sm") {{ conv.source }}
                   p.text-xs.text-muted
-                    | Iniciativa: 
+                    | Iniciativa:
                     span.font-medium {{ conv.initiativeTitle || '—' }}
 
         //- Column 3: Requirements in Refinement
         UPageCard(title="Requerimientos en Refinamiento")
           template(#description)
             p.text-xs.text-muted Tareas y funcionalidades pendientes de maduración.
-          
+
           .space-y-4
             .flex.items-center.justify-center.py-8(v-if="isDashboardLoading")
               UIcon.size-5.animate-spin.text-muted(name="i-lucide-loader-circle")
-            
+
             p.text-sm.text-dimmed(v-else-if="refiningRequirements.length === 0") Sin requerimientos en refinamiento.
-            
+
             ul.divide-y.divide-default(v-else)
               li.py-3(class="first:pt-0 last:pb-0" v-for="req in refiningRequirements" :key="req.id")
                 .flex.items-start.justify-between.gap-3
                   .min-w-0.space-y-1
                     ULink.font-semibold.text-sm(class="hover:underline" :to="`/iniciativas/${req.initiativeId}?tab=requirements`") {{ req.title }}
                     p.text-xs.text-muted
-                      | Iniciativa: 
+                      | Iniciativa:
                       span.font-medium {{ req.initiativeTitle || '—' }}
                   .flex.flex-col.items-end.gap-1.shrink-0
                     UBadge(
@@ -264,7 +266,7 @@ watch(
               autofocus
               class="w-full"
             )
-          
+
           UFormField(label="Descripción" name="description")
             UTextarea(
               v-model="newInitiative.description"
