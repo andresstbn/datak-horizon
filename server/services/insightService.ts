@@ -1,4 +1,7 @@
 import { insightRepository, type InsightWithDetails } from '../repositories/insightRepository'
+import { initiativeRepository } from '../repositories/initiativeRepository'
+import { userRepository } from '../repositories/userRepository'
+import { slackService } from './slackService'
 import type { Insight, CreateInsightInput } from '../../shared/types/insight'
 import type { OwnerRef } from '../../shared/types/initiative'
 
@@ -59,6 +62,24 @@ export const insightService = {
       throw new Error('Failed to retrieve newly created insight')
     }
 
-    return toInsight(matched)
+    const result = toInsight(matched)
+
+    // Trigger Slack notification asynchronously
+    if (process.env.VITEST !== 'true') {
+      Promise.all([
+        initiativeRepository.findById(initiativeId),
+        userRepository.findById(userId)
+      ]).then(([initiative, user]) => {
+        if (initiative) {
+          slackService.notifyInsightCreated(
+            initiative.title,
+            result,
+            user?.displayName || user?.email || undefined
+          )
+        }
+      }).catch(err => console.error('Error sending insight Slack notification:', err))
+    }
+
+    return result
   }
 }

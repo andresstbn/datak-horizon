@@ -1,4 +1,7 @@
 import { conversationRepository, type ConversationWithCreator, type ConversationWithInitiative } from '../repositories/conversationRepository'
+import { initiativeRepository } from '../repositories/initiativeRepository'
+import { userRepository } from '../repositories/userRepository'
+import { slackService } from './slackService'
 import type { Conversation, CreateConversationInput } from '../../shared/types/conversation'
 import type { OwnerRef } from '../../shared/types/initiative'
 
@@ -66,7 +69,7 @@ export const conversationService = {
       throw new Error('Failed to retrieve created conversation')
     }
 
-    return {
+    const result: Conversation = {
       id: full.id,
       initiativeId: full.initiativeId,
       title: full.title,
@@ -76,5 +79,23 @@ export const conversationService = {
       updatedAt: full.updatedAt.toISOString(),
       createdBy: null
     }
+
+    // Trigger Slack notification asynchronously
+    if (process.env.VITEST !== 'true') {
+      Promise.all([
+        initiativeRepository.findById(initiativeId),
+        userRepository.findById(userId)
+      ]).then(([initiative, user]) => {
+        if (initiative) {
+          slackService.notifyConversationCreated(
+            initiative.title,
+            result,
+            user?.displayName || user?.email || undefined
+          )
+        }
+      }).catch(err => console.error('Error sending conversation Slack notification:', err))
+    }
+
+    return result
   }
 }

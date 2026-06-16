@@ -23,6 +23,12 @@ export const userRepository = {
     return row
   },
 
+  async findById(id: string): Promise<User | undefined> {
+    const db = getDb()
+    const [row] = await db.select().from(users).where(eq(users.id, id)).limit(1)
+    return row
+  },
+
   async create(data: NewUser): Promise<User> {
     const db = getDb()
     const [row] = await db.insert(users).values(data).returning()

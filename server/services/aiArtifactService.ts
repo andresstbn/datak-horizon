@@ -1,4 +1,7 @@
 import { aiArtifactRepository, type ArtifactWithDetails } from '../repositories/aiArtifactRepository'
+import { initiativeRepository } from '../repositories/initiativeRepository'
+import { userRepository } from '../repositories/userRepository'
+import { slackService } from './slackService'
 import type { AIArtifact, CreateArtifactInput, UpdateArtifactInput } from '../../shared/types/artifact'
 import type { OwnerRef } from '../../shared/types/initiative'
 
@@ -69,7 +72,25 @@ export const aiArtifactService = {
       throw new Error('Failed to retrieve newly created artifact')
     }
 
-    return toArtifact(full)
+    const result = toArtifact(full)
+
+    // Trigger Slack notification asynchronously
+    if (process.env.VITEST !== 'true') {
+      Promise.all([
+        initiativeRepository.findById(initiativeId),
+        userRepository.findById(userId)
+      ]).then(([initiative, user]) => {
+        if (initiative) {
+          slackService.notifyArtifactCreated(
+            initiative.title,
+            result,
+            user?.displayName || user?.email || undefined
+          )
+        }
+      }).catch(err => console.error('Error sending artifact Slack notification:', err))
+    }
+
+    return result
   },
 
   async update(id: string, data: UpdateArtifactInput): Promise<AIArtifact> {

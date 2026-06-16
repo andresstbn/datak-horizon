@@ -9,6 +9,8 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
+    slackWebhookUrl: process.env.SLACK_WEBHOOK_URL,
+    appBaseUrl: process.env.APP_BASE_URL,
     public: {
       // Exposed Firebase client config.
       firebase: {

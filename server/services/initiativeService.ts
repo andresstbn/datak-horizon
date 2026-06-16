@@ -3,6 +3,8 @@ import {
   type InitiativeDetailRow,
   type InitiativeWithOwners
 } from '../repositories/initiativeRepository'
+import { userRepository } from '../repositories/userRepository'
+import { slackService } from './slackService'
 import type {
   InitiativeDetail,
   InitiativeListItem,
@@ -81,7 +83,16 @@ export const initiativeService = {
     })
 
     const detailed = await initiativeRepository.findById(row.id)
-    return toDetail(detailed!)
+    const result = toDetail(detailed!)
+
+    // Trigger Slack notification asynchronously
+    if (process.env.VITEST !== 'true') {
+      userRepository.findById(userId).then((user) => {
+        slackService.notifyInitiativeCreated(result, user?.displayName || user?.email || undefined)
+      }).catch(err => console.error('Error fetching creator for Slack notification:', err))
+    }
+
+    return result
   },
 
   async update(id: string, data: Partial<NewInitiative>): Promise<InitiativeDetail | null> {

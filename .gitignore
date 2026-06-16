@@ -30,3 +30,4 @@ coverage/
 credentials/
 *.serviceAccount.json
 serviceAccount*.json
+app.yaml

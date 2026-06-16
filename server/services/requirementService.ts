@@ -1,4 +1,7 @@
 import { requirementRepository, type RequirementWithDetails, type RequirementWithInitiative } from '../repositories/requirementRepository'
+import { initiativeRepository } from '../repositories/initiativeRepository'
+import { userRepository } from '../repositories/userRepository'
+import { slackService } from './slackService'
 import type { Requirement, CreateRequirementInput, UpdateRequirementInput } from '../../shared/types/requirement'
 import type { OwnerRef } from '../../shared/types/initiative'
 
@@ -74,7 +77,25 @@ export const requirementService = {
       throw new Error('Failed to retrieve newly created requirement')
     }
 
-    return toRequirement(matched)
+    const result = toRequirement(matched)
+
+    // Trigger Slack notification asynchronously
+    if (process.env.VITEST !== 'true') {
+      Promise.all([
+        initiativeRepository.findById(initiativeId),
+        userRepository.findById(userId)
+      ]).then(([initiative, user]) => {
+        if (initiative) {
+          slackService.notifyRequirementCreated(
+            initiative.title,
+            result,
+            user?.displayName || user?.email || undefined
+          )
+        }
+      }).catch(err => console.error('Error sending requirement Slack notification:', err))
+    }
+
+    return result
   },
 
   async update(id: string, data: UpdateRequirementInput): Promise<Requirement> {
