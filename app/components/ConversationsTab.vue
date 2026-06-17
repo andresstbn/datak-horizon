@@ -17,7 +17,8 @@ const {
   fetchConversations,
   selectConversation,
   createConversation,
-  postMessage
+  postMessage,
+  deleteMessage
 } = useConversations(props.initiativeId)
 
 const currentConversation = computed(() => {
@@ -91,6 +92,12 @@ async function handleSendMessage() {
   }
 }
 
+async function handleDeleteMessage(messageId: string) {
+  if (confirm('¿Estás seguro de que deseas eliminar este comentario?')) {
+    await deleteMessage(messageId)
+  }
+}
+
 onMounted(fetchConversations)
 </script>
 
@@ -155,7 +162,7 @@ onMounted(fetchConversations)
       template(v-else-if="selectedConversationId")
         p.text-xs.text-center.text-dimmed.my-2 Comienzo del hilo de refinamiento.
 
-        .flex.gap-3(
+        .flex.gap-3.group(
           v-for="msg in activeMessages"
           :key="msg.id"
           :class="msg.role === 'user' ? 'justify-start' : 'justify-start md:pl-8'"
@@ -167,9 +174,20 @@ onMounted(fetchConversations)
             class="mt-1"
           )
           .flex-1.min-w-0
-            .flex.items-baseline.gap-2
-              span.text-xs.font-semibold {{ msg.author?.displayName ?? 'Sistema' }}
-              span.text-muted(class="text-[10px]") {{ formatRelativeTime(msg.createdAt) }}
+            .flex.items-center.justify-between.gap-2.w-full
+              .flex.items-baseline.gap-2.min-w-0
+                span.text-xs.font-semibold.truncate {{ msg.author?.displayName ?? 'Sistema' }}
+                span.text-muted.shrink-0(class="text-[10px]") {{ formatRelativeTime(msg.createdAt) }}
+              UButton(
+                v-if="msg.role === 'user'"
+                icon="i-lucide-trash-2"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                class="opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                aria-label="Eliminar comentario"
+                @click="handleDeleteMessage(msg.id)"
+              )
             .text-sm.text-muted.mt-1.bg-default.p-3.rounded-lg.border.border-default(
               v-html="renderMarkdown(msg.body)"
             )

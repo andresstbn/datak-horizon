@@ -31,6 +31,7 @@ function toRequirement(row: RequirementWithDetails): Requirement {
     priority: row.priority,
     status: row.status,
     createdById: row.createdById,
+    confluenceUrl: row.confluenceUrl,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     createdBy: toCreatorRef(row.createdBy),
@@ -68,7 +69,8 @@ export const requirementService = {
       description: data.description,
       priority: data.priority,
       status: data.status ?? 'draft',
-      createdById: userId
+      createdById: userId,
+      confluenceUrl: data.confluenceUrl ?? null
     })
 
     const list = await requirementRepository.listByInitiative(initiativeId)
@@ -108,5 +110,9 @@ export const requirementService = {
     }
 
     return toRequirement(matched)
+  },
+
+  async delete(id: string): Promise<void> {
+    await requirementRepository.delete(id)
   }
 }

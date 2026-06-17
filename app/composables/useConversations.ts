@@ -77,6 +77,19 @@ export function useConversations(initiativeId: string) {
     }
   }
 
+  async function deleteMessage(messageId: string): Promise<boolean> {
+    const token = await getIdToken()
+    if (!token) return false
+    try {
+      await conversationService.deleteMessage(token, messageId)
+      activeMessages.value = activeMessages.value.filter(m => m.id !== messageId)
+      return true
+    } catch {
+      errorMessage.value = 'Error al eliminar el mensaje.'
+      return false
+    }
+  }
+
   return {
     conversations,
     activeMessages,
@@ -87,6 +100,7 @@ export function useConversations(initiativeId: string) {
     fetchConversations,
     selectConversation,
     createConversation,
-    postMessage
+    postMessage,
+    deleteMessage
   }
 }

@@ -12,6 +12,7 @@ export interface Requirement {
   priority: RequirementPriority
   status: RequirementStatus
   createdById: string | null
+  confluenceUrl?: string | null
   createdAt: string
   updatedAt: string
   createdBy?: OwnerRef | null
@@ -24,6 +25,7 @@ export interface CreateRequirementInput {
   description: string
   priority: RequirementPriority
   status?: RequirementStatus
+  confluenceUrl?: string | null
 }
 
 export interface UpdateRequirementInput {
@@ -31,4 +33,5 @@ export interface UpdateRequirementInput {
   description?: string
   priority?: RequirementPriority
   status?: RequirementStatus
+  confluenceUrl?: string | null
 }

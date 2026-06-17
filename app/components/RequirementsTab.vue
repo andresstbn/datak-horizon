@@ -14,7 +14,8 @@ const {
   errorMessage,
   fetchRequirements,
   createRequirement,
-  updateRequirementStatus
+  updateRequirementStatus,
+  deleteRequirement
 } = useRequirements(props.initiativeId)
 
 const {
@@ -30,11 +31,13 @@ const newReq = ref<{
   description: string
   priority: RequirementPriority
   sourceConversationId: string | null
+  confluenceUrl: string
 }>({
   title: '',
   description: '',
   priority: 'must',
-  sourceConversationId: null
+  sourceConversationId: null,
+  confluenceUrl: ''
 })
 
 const priorityOptions = [
@@ -109,17 +112,18 @@ function renderMarkdown(text: string): string {
 }
 
 async function handleCreateReq() {
-  if (!newReq.value.title.trim() || !newReq.value.description.trim()) return
+  if (!newReq.value.title.trim()) return
   isSubmitting.value = true
   try {
     await createRequirement(
       newReq.value.title.trim(),
       newReq.value.description.trim(),
       newReq.value.priority,
-      newReq.value.sourceConversationId
+      newReq.value.sourceConversationId,
+      newReq.value.confluenceUrl.trim() || null
     )
     createOpen.value = false
-    newReq.value = { title: '', description: '', priority: 'must', sourceConversationId: null }
+    newReq.value = { title: '', description: '', priority: 'must', sourceConversationId: null, confluenceUrl: '' }
   } finally {
     isSubmitting.value = false
   }
@@ -127,6 +131,12 @@ async function handleCreateReq() {
 
 async function handleStatusChange(reqId: string, status: RequirementStatus) {
   await updateRequirementStatus(reqId, status)
+}
+
+async function handleDeleteRequirement(reqId: string) {
+  if (confirm('¿Estás seguro de que deseas eliminar este requerimiento?')) {
+    await deleteRequirement(reqId)
+  }
 }
 
 onMounted(() => {
@@ -188,8 +198,19 @@ onMounted(() => {
                 size="sm"
                 variant="subtle"
               )
+              UButton(
+                icon="i-lucide-trash-2"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                aria-label="Eliminar requerimiento"
+                @click="handleDeleteRequirement(req.id)"
+              )
 
         .text-sm.text-muted.my-2.prose(class="dark:prose-invert" v-html="renderMarkdown(req.description)")
+
+        .mt-3.mb-1(v-if="req.confluenceUrl")
+          ConfluencePreview(:url="req.confluenceUrl")
 
         template(#footer)
           .flex.items-center.justify-between.gap-4.w-full
@@ -230,7 +251,14 @@ onMounted(() => {
             class="w-full"
           )
 
-        UFormField(label="Descripción y Alcance (Markdown)" name="description" required)
+        UFormField(label="Enlace de Confluence" name="confluenceUrl")
+          UInput(
+            v-model="newReq.confluenceUrl"
+            placeholder="Ej. https://datak.atlassian.net/wiki/spaces/..."
+            class="w-full"
+          )
+
+        UFormField(label="Descripción y Alcance (Markdown)" name="description")
           UTextarea(
             v-model="newReq.description"
             placeholder="Describe el requerimiento técnico o funcional..."

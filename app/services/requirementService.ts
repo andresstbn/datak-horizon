@@ -35,5 +35,12 @@ export const requirementService = {
       headers: { Authorization: `Bearer ${idToken}` },
       body: data
     })
+  },
+
+  async delete(idToken: string, requirementId: string): Promise<void> {
+    return $fetch(`/api/requirements/${requirementId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${idToken}` }
+    })
   }
 }

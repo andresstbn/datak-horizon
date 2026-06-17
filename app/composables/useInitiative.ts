@@ -38,10 +38,24 @@ export function useInitiative(id: string) {
     }
   }
 
+  async function updateInitiative(data: Partial<InitiativeDetail>): Promise<boolean> {
+    const token = await getIdToken()
+    if (!token) return false
+    try {
+      const updated = await initiativeService.update(token, id, data)
+      initiative.value = updated
+      return true
+    } catch {
+      errorMessage.value = 'Error al actualizar la iniciativa.'
+      return false
+    }
+  }
+
   return {
     initiative,
     isLoading,
     errorMessage,
-    fetchInitiative
+    fetchInitiative,
+    updateInitiative
   }
 }

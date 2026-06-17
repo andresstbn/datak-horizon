@@ -10,7 +10,10 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     slackWebhookUrl: '',
-    appBaseUrl: 'http://localhost:3000',
+    siteUrl: 'http://localhost:3000',
+    confluenceDomain: '',
+    confluenceEmail: '',
+    confluenceApiToken: '',
     public: {
       // Exposed Firebase client config.
       firebase: {

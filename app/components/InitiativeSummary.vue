@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import { useInitiative } from '~/composables/useInitiative'
 import type { InitiativeDetail } from '~~/shared/types/initiative'
 import {
   formatInitiativeDate,
@@ -7,18 +9,86 @@ import {
   healthBadge
 } from '~~/shared/utils/initiatives'
 
-defineProps<{
+const props = defineProps<{
   initiative: InitiativeDetail
 }>()
+
+const emit = defineEmits<{
+  (e: 'updated'): void
+}>()
+
+const { updateInitiative } = useInitiative(props.initiative.id)
+
+const isEditing = ref(false)
+const editDesc = ref('')
+const isSaving = ref(false)
+
+function startEdit() {
+  editDesc.value = props.initiative.description || ''
+  isEditing.value = true
+}
+
+function cancelEdit() {
+  isEditing.value = false
+}
+
+async function saveEdit() {
+  isSaving.value = true
+  try {
+    const success = await updateInitiative({ description: editDesc.value.trim() || null })
+    if (success) {
+      isEditing.value = false
+      emit('updated')
+    }
+  } finally {
+    isSaving.value = false
+  }
+}
 </script>
 
 <template lang="pug">
 .grid.gap-6(class="lg:grid-cols-[1.65fr_1fr]")
-  //- Left column: description only.
+  //- Left column: description and scope.
   .space-y-6
-    UPageCard(title="Descripción de la Iniciativa")
-      p.text-sm.text-muted.whitespace-pre-wrap(v-if="initiative.description") {{ initiative.description }}
-      p.text-sm.text-dimmed(v-else) Sin descripción todavía.
+    UPageCard
+      template(#header)
+        .flex.items-center.justify-between.w-full
+          h3.text-sm.font-semibold.text-muted Descripción de la Iniciativa
+          UButton(
+            v-if="!isEditing"
+            icon="i-lucide-pencil"
+            size="xs"
+            variant="ghost"
+            color="primary"
+            label="Editar"
+            @click="startEdit"
+          )
+
+      div(v-if="isEditing" class="space-y-4")
+        UTextarea(
+          v-model="editDesc"
+          placeholder="Escribe la descripción de la iniciativa..."
+          class="w-full"
+          :rows="6"
+        )
+        .flex.items-center.justify-end.gap-2
+          UButton(
+            label="Cancelar"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="cancelEdit"
+          )
+          UButton(
+            label="Guardar"
+            color="primary"
+            size="xs"
+            :loading="isSaving"
+            @click="saveEdit"
+          )
+      div(v-else)
+        p.text-sm.text-muted.whitespace-pre-wrap(v-if="initiative.description") {{ initiative.description }}
+        p.text-sm.text-dimmed(v-else) Sin descripción todavía.
 
   //- Right column: details panel.
   UPageCard(title="Detalles de Roadmap")

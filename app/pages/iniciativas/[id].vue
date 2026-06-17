@@ -136,7 +136,7 @@ watch(
 
       UTabs(v-model="activeTab" :items="tabItems" variant="link" :ui="{ root: 'gap-4' }")
         template(#resumen)
-          InitiativeSummary(:initiative="initiative")
+          InitiativeSummary(:initiative="initiative" @updated="fetchInitiative")
 
         template(#conversations)
           ConversationsTab(:initiative-id="id")

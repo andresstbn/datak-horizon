@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
   if (body.description !== undefined) payload.description = body.description
   if (body.priority !== undefined) payload.priority = body.priority
   if (body.status !== undefined) payload.status = body.status
+  if (body.confluenceUrl !== undefined) payload.confluenceUrl = body.confluenceUrl
 
   return requirementService.update(id, payload)
 })

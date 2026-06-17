@@ -26,7 +26,8 @@ export function useRequirements(initiativeId: string) {
     title: string,
     description: string,
     priority: RequirementPriority,
-    sourceConversationId: string | null = null
+    sourceConversationId: string | null = null,
+    confluenceUrl: string | null = null
   ): Promise<boolean> {
     const token = await getIdToken()
     if (!token) return false
@@ -37,7 +38,8 @@ export function useRequirements(initiativeId: string) {
         description,
         priority,
         sourceConversationId,
-        status: 'draft'
+        status: 'draft',
+        confluenceUrl
       })
       requirements.value = [created, ...requirements.value]
       return true
@@ -60,12 +62,26 @@ export function useRequirements(initiativeId: string) {
     }
   }
 
+  async function deleteRequirement(reqId: string): Promise<boolean> {
+    const token = await getIdToken()
+    if (!token) return false
+    try {
+      await requirementService.delete(token, reqId)
+      requirements.value = requirements.value.filter(r => r.id !== reqId)
+      return true
+    } catch {
+      errorMessage.value = 'Error al eliminar el requerimiento.'
+      return false
+    }
+  }
+
   return {
     requirements,
     isLoading,
     errorMessage,
     fetchRequirements,
     createRequirement,
-    updateRequirementStatus
+    updateRequirementStatus,
+    deleteRequirement
   }
 }

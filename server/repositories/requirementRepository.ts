@@ -70,6 +70,11 @@ export const requirementRepository = {
       .where(eq(requirements.id, id))
       .returning()
     return row!
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb()
+    await db.delete(requirements).where(eq(requirements.id, id))
   }
 }
 

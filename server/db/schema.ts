@@ -253,6 +253,7 @@ export const requirements = pgTable(
     createdById: uuid('created_by_id').references(() => users.id, {
       onDelete: 'set null'
     }),
+    confluenceUrl: text('confluence_url'),
     ...timestamps
   },
   table => [index('requirements_initiative_idx').on(table.initiativeId)]

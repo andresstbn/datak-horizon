@@ -27,6 +27,11 @@ export const conversationMessageRepository = {
     const db = getDb()
     const [row] = await db.insert(conversationMessages).values(data).returning()
     return row!
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb()
+    await db.delete(conversationMessages).where(eq(conversationMessages.id, id))
   }
 }
 

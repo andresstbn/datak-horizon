@@ -15,9 +15,6 @@ export default defineEventHandler(async (event) => {
   if (!body || typeof body.title !== 'string' || !body.title.trim()) {
     throw createError({ statusCode: 400, statusMessage: 'El título del requerimiento es obligatorio.' })
   }
-  if (typeof body.description !== 'string' || !body.description.trim()) {
-    throw createError({ statusCode: 400, statusMessage: 'La descripción del requerimiento es obligatoria.' })
-  }
   if (!body.priority) {
     throw createError({ statusCode: 400, statusMessage: 'La prioridad del requerimiento es obligatoria.' })
   }
@@ -27,8 +24,9 @@ export default defineEventHandler(async (event) => {
   return requirementService.create(id, {
     sourceConversationId: body.sourceConversationId || null,
     title: body.title.trim(),
-    description: body.description.trim(),
+    description: typeof body.description === 'string' ? body.description.trim() : '',
     priority: body.priority,
-    status: body.status || 'draft'
+    status: body.status || 'draft',
+    confluenceUrl: body.confluenceUrl || null
   }, user.id)
 })

@@ -38,7 +38,7 @@ async function sendSlackMessage(blocks: unknown[], fallbackText: string) {
 export const slackService = {
   async notifyInitiativeCreated(initiative: InitiativeDetail, creatorName?: string) {
     const config = useRuntimeConfig()
-    const baseUrl = config.appBaseUrl || 'http://localhost:3000'
+    const baseUrl = config.siteUrl || 'http://localhost:3000'
     const link = `${baseUrl}/iniciativas/${initiative.id}`
     const fallbackText = `Nueva iniciativa creada: ${initiative.title}`
 
@@ -88,7 +88,7 @@ export const slackService = {
 
   async notifyRequirementCreated(initiativeTitle: string, requirement: Requirement, creatorName?: string) {
     const config = useRuntimeConfig()
-    const baseUrl = config.appBaseUrl || 'http://localhost:3000'
+    const baseUrl = config.siteUrl || 'http://localhost:3000'
     const link = `${baseUrl}/iniciativas/${requirement.initiativeId}?tab=requirements`
     const fallbackText = `Nuevo requerimiento añadido a "${initiativeTitle}": ${requirement.title}`
 
@@ -137,7 +137,7 @@ export const slackService = {
 
   async notifyInsightCreated(initiativeTitle: string, insight: Insight, creatorName?: string) {
     const config = useRuntimeConfig()
-    const baseUrl = config.appBaseUrl || 'http://localhost:3000'
+    const baseUrl = config.siteUrl || 'http://localhost:3000'
     const link = `${baseUrl}/iniciativas/${insight.initiativeId}?tab=insights`
     const fallbackText = `Nuevo insight añadido a "${initiativeTitle}": ${insight.body.substring(0, 50)}...`
 
@@ -186,7 +186,7 @@ export const slackService = {
 
   async notifyConversationCreated(initiativeTitle: string, conversation: Conversation, creatorName?: string) {
     const config = useRuntimeConfig()
-    const baseUrl = config.appBaseUrl || 'http://localhost:3000'
+    const baseUrl = config.siteUrl || 'http://localhost:3000'
     const link = `${baseUrl}/iniciativas/${conversation.initiativeId}?tab=conversations`
     const fallbackText = `Nueva conversación añadida a "${initiativeTitle}": ${conversation.title}`
 
@@ -228,7 +228,7 @@ export const slackService = {
 
   async notifyArtifactCreated(initiativeTitle: string, artifact: AIArtifact, creatorName?: string) {
     const config = useRuntimeConfig()
-    const baseUrl = config.appBaseUrl || 'http://localhost:3000'
+    const baseUrl = config.siteUrl || 'http://localhost:3000'
     const link = `${baseUrl}/iniciativas/${artifact.initiativeId}?tab=artifacts`
     const fallbackText = `Nuevo artefacto generado en "${initiativeTitle}": ${artifact.title}`
 

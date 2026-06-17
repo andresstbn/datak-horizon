@@ -41,5 +41,12 @@ export const conversationService = {
       headers: { Authorization: `Bearer ${idToken}` },
       body: data
     })
+  },
+
+  async deleteMessage(idToken: string, messageId: string): Promise<void> {
+    return $fetch(`/api/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${idToken}` }
+    })
   }
 }
