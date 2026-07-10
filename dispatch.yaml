@@ -1,7 +1,4 @@
 dispatch:
-  - url: "datak.co/*"
-    service: default
-
   - url: "app.ocimec.com.co/*"
     service: ocimec-frontend
 
