@@ -1,6 +1,0 @@
-dispatch:
-  - url: "app.ocimec.com.co/*"
-    service: ocimec-frontend
-
-  - url: "ocimec.com.co/*"
-    service: ocimec-frontend
