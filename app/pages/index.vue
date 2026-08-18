@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Conversation } from '~~/shared/types/conversation'
 import type { Requirement } from '~~/shared/types/requirement'
+import type { InitiativeStatus } from '~~/shared/types/initiative'
 import { statusBadge, healthBadge, priorityBadge } from '~~/shared/utils/initiatives'
 import { conversationService } from '~/services/conversationService'
 import { requirementService } from '~/services/requirementService'
@@ -35,6 +36,77 @@ const refiningRequirements = ref<(Requirement & { initiativeTitle?: string })[]>
 const isDashboardLoading = ref(false)
 const toast = useToast()
 
+const ALL_STATUS_OPTIONS: { label: string, value: InitiativeStatus }[] = [
+  { label: 'Descubrimiento', value: 'discovery' },
+  { label: 'Refinamiento', value: 'refinement' },
+  { label: 'Listo', value: 'ready' },
+  { label: 'En desarrollo', value: 'in_development' },
+  { label: 'QA', value: 'qa' },
+  { label: 'Bloqueado', value: 'blocked' },
+  { label: 'Desplegado', value: 'released' },
+  { label: 'Cancelado', value: 'cancelled' }
+]
+
+const DEFAULT_ACTIVE_STATUSES: InitiativeStatus[] = [
+  'discovery',
+  'refinement',
+  'ready',
+  'in_development',
+  'qa',
+  'blocked'
+]
+
+const selectedStatuses = useState<InitiativeStatus[]>(
+  'dashboard:selectedStatuses',
+  () => [...DEFAULT_ACTIVE_STATUSES]
+)
+
+function selectAllStatuses() {
+  selectedStatuses.value = ALL_STATUS_OPTIONS.map(opt => opt.value)
+}
+
+function selectDefaultActive() {
+  selectedStatuses.value = [...DEFAULT_ACTIVE_STATUSES]
+}
+
+function selectWithoutQa() {
+  selectedStatuses.value = DEFAULT_ACTIVE_STATUSES.filter(s => s !== 'qa')
+}
+
+function toggleStatus(status: InitiativeStatus) {
+  if (selectedStatuses.value.includes(status)) {
+    selectedStatuses.value = selectedStatuses.value.filter(s => s !== status)
+  } else {
+    selectedStatuses.value = [...selectedStatuses.value, status]
+  }
+}
+
+const statusCounts = computed(() => {
+  const counts: Record<InitiativeStatus, number> = {
+    discovery: 0,
+    refinement: 0,
+    ready: 0,
+    in_development: 0,
+    qa: 0,
+    released: 0,
+    blocked: 0,
+    cancelled: 0
+  }
+  for (const item of initiativesList.value) {
+    if (item.status in counts) {
+      counts[item.status]++
+    }
+  }
+  return counts
+})
+
+// Filtered active initiatives
+const activeInitiatives = computed(() => {
+  return initiativesList.value.filter(item =>
+    selectedStatuses.value.includes(item.status)
+  )
+})
+
 async function fetchDashboardData() {
   const token = await getIdToken()
   if (!token) return
@@ -52,13 +124,6 @@ async function fetchDashboardData() {
     isDashboardLoading.value = false
   }
 }
-
-// Active initiatives helper
-const activeInitiatives = computed(() => {
-  return initiativesList.value.filter(
-    item => !['released', 'cancelled'].includes(item.status)
-  )
-})
 
 async function handleCreate() {
   if (!newInitiative.value.title.trim()) {
@@ -165,15 +230,56 @@ watch(
     template(v-if="activeTab === 'dashboard'")
       .grid.grid-cols-1.gap-6(class="lg:grid-cols-3")
         //- Column 1: Active Initiatives
-        UPageCard(title="Iniciativas Activas")
-          template(#description)
-            p.text-xs.text-muted Esfuerzos en curso (excluye completados/cancelados).
+        UPageCard
+          template(#header)
+            .flex.items-center.justify-between.gap-2.w-full
+              div(class="space-y-0.5")
+                h3.text-base.font-semibold Iniciativas Activas
+                p.text-xs.text-muted Esfuerzos en curso ({{ activeInitiatives.length }} de {{ initiativesList.length }})
+              UPopover
+                UButton(
+                  icon="i-lucide-filter"
+                  :label="`Filtro (${selectedStatuses.length})`"
+                  size="xs"
+                  color="neutral"
+                  variant="subtle"
+                )
+                template(#content)
+                  .p-3.space-y-3.w-64
+                    .flex.items-center.justify-between.border-b.border-default.pb-2
+                      span.text-xs.font-semibold Filtrar estados
+                      .flex.items-center.gap-1
+                        UButton(label="Sin QA" size="xs" variant="ghost" color="neutral" @click="selectWithoutQa")
+                        UButton(label="Todos" size="xs" variant="ghost" color="neutral" @click="selectAllStatuses")
+
+                    .space-y-2
+                      .flex.items-center.justify-between(v-for="opt in ALL_STATUS_OPTIONS" :key="opt.value")
+                        UCheckbox(
+                          :model-value="selectedStatuses.includes(opt.value)"
+                          :label="opt.label"
+                          size="sm"
+                          @update:model-value="toggleStatus(opt.value)"
+                        )
+                        UBadge(
+                          :color="statusBadge(opt.value).color"
+                          :label="String(statusCounts[opt.value] || 0)"
+                          size="xs"
+                          variant="subtle"
+                        )
 
           .space-y-4
             .flex.items-center.justify-center.py-8(v-if="isInitiativesLoading")
               UIcon.size-5.animate-spin.text-muted(name="i-lucide-loader-circle")
 
-            p.text-sm.text-dimmed(v-else-if="activeInitiatives.length === 0") Sin iniciativas activas.
+            .text-center.py-8.space-y-2(v-else-if="activeInitiatives.length === 0")
+              p.text-sm.text-dimmed No hay iniciativas con los estados seleccionados.
+              UButton(
+                label="Restablecer filtros"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                @click="selectDefaultActive"
+              )
 
             ul.divide-y.divide-default(v-else)
               li.py-3(class="first:pt-0 last:pb-0" v-for="item in activeInitiatives" :key="item.id")
@@ -182,11 +288,11 @@ watch(
                     ULink.font-semibold.text-sm(class="hover:underline" :to="`/iniciativas/${item.id}`") {{ item.title }}
                     p.text-xs.text-muted.truncate(v-if="item.description") {{ item.description }}
                   .flex.flex-col.items-end.gap-1.shrink-0
-                    UBadge(
-                      :color="statusBadge(item.status).color"
-                      :label="statusBadge(item.status).label"
-                      size="sm"
-                      variant="subtle"
+                    InitiativeStatusBadge(
+                      :status="item.status"
+                      :initiative-id="item.id"
+                      :initiative-title="item.title"
+                      @updated="fetchDashboardData"
                     )
                     UBadge(
                       :color="healthBadge(item.health).color"

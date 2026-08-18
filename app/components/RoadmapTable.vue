@@ -39,10 +39,10 @@ UTable(
     ULink.font-medium(:to="`/iniciativas/${row.original.id}`") {{ row.original.title }}
 
   template(#status-cell="{ row }")
-    UBadge(
-      :color="statusBadge(row.original.status).color"
-      :label="statusBadge(row.original.status).label"
-      variant="subtle"
+    InitiativeStatusBadge(
+      :status="row.original.status"
+      :initiative-id="row.original.id"
+      :initiative-title="row.original.title"
     )
 
   template(#health-cell="{ row }")

@@ -62,6 +62,27 @@ export function useInitiatives() {
     page.value = 1
   }, { deep: true })
 
+  async function updateInitiativeStatus(id: string, newStatus: InitiativeListItem['status']): Promise<boolean> {
+    const token = await getIdToken()
+    if (!token) return false
+
+    try {
+      const updated = await initiativeService.update(token, id, { status: newStatus })
+      const index = items.value.findIndex(item => item.id === id)
+      const currentItem = items.value[index]
+      if (index !== -1 && currentItem) {
+        items.value[index] = {
+          ...currentItem,
+          status: updated.status
+        }
+      }
+      return true
+    } catch (error) {
+      console.error('Error updating initiative status:', error)
+      return false
+    }
+  }
+
   return {
     items,
     isLoading,
@@ -72,6 +93,7 @@ export function useInitiatives() {
     filtered,
     paginated,
     owners,
-    fetchInitiatives
+    fetchInitiatives,
+    updateInitiativeStatus
   }
 }
