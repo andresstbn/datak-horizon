@@ -12,21 +12,13 @@ const { isReady, isAuthenticated, getIdToken } = useAuth()
 const { initiative, isLoading, errorMessage, fetchInitiative } = useInitiative(id)
 const toast = useToast()
 
-const { data: preview } = await useAsyncData(
-  `initiative-preview:${id}`,
-  () => initiativeService.getPublicPreview(id).catch(() => null)
-)
-
-const previewTitle = computed(() =>
-  preview.value?.title ? `${preview.value.title} · Datak Horizon` : 'Iniciativa · Datak Horizon'
-)
-
+// Browser tab title only. Resolved client-side from the already-authenticated
+// detail fetch, so the SSR html an unauthenticated visitor (or a link unfurler)
+// receives keeps the generic app-wide title from `app.vue`.
 useSeoMeta({
-  title: previewTitle,
-  ogTitle: previewTitle,
-  ogSiteName: 'Datak Horizon',
-  description: () => undefined,
-  ogDescription: () => undefined
+  title: () => initiative.value?.title
+    ? `${initiative.value.title} · Datak Horizon`
+    : 'Iniciativa · Datak Horizon'
 })
 
 const tabItems = [

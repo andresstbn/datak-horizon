@@ -21,7 +21,6 @@ vi.mock('../../server/repositories/initiativeRepository', () => ({
   initiativeRepository: {
     create: vi.fn(),
     findById: vi.fn(),
-    findTitleById: vi.fn(),
     update: vi.fn()
   }
 }))
@@ -120,35 +119,6 @@ describe('Horizon Core Services', () => {
           createdById: 'user-abc'
         })
       )
-    })
-
-    it('returns only minimal id and title for public preview, strictly excluding sensitive attributes', async () => {
-      vi.mocked(initiativeRepository.findTitleById).mockResolvedValue({
-        id: 'init-123',
-        title: 'IVA Diferencial Digital'
-      })
-
-      const result = await initiativeService.getPublicPreview('init-123')
-
-      expect(result).toEqual({
-        id: 'init-123',
-        title: 'IVA Diferencial Digital'
-      })
-      // Ensure no leakage of description, specs, users, etc.
-      expect(result).not.toHaveProperty('description')
-      expect(result).not.toHaveProperty('functionalOwner')
-      expect(result).not.toHaveProperty('technicalOwner')
-      expect(result).not.toHaveProperty('createdById')
-      expect(initiativeRepository.findTitleById).toHaveBeenCalledWith('init-123')
-    })
-
-    it('returns null when initiative is not found for public preview', async () => {
-      vi.mocked(initiativeRepository.findTitleById).mockResolvedValue(null)
-
-      const result = await initiativeService.getPublicPreview('non-existent-id')
-
-      expect(result).toBeNull()
-      expect(initiativeRepository.findTitleById).toHaveBeenCalledWith('non-existent-id')
     })
   })
 

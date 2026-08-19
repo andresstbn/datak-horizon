@@ -52,12 +52,6 @@ export interface InitiativeDetail extends InitiativeListItem {
   createdById: string | null
 }
 
-/** Minimal public projection for social previews and link sharing. */
-export interface InitiativePublicPreview {
-  id: string
-  title: string
-}
-
 /** Sentinel meaning "no filter applied" for the select filters. */
 export const ANY_OPTION = 'all' as const
 

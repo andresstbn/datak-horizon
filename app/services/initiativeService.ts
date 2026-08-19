@@ -1,7 +1,6 @@
 import type {
   InitiativeDetail,
-  InitiativeListItem,
-  InitiativePublicPreview
+  InitiativeListItem
 } from '~~/shared/types/initiative'
 
 /**
@@ -19,10 +18,6 @@ export const initiativeService = {
     return $fetch<InitiativeDetail>(`/api/initiatives/${id}`, {
       headers: { Authorization: `Bearer ${idToken}` }
     })
-  },
-
-  async getPublicPreview(id: string): Promise<InitiativePublicPreview> {
-    return $fetch<InitiativePublicPreview>(`/api/initiatives/${id}/preview`)
   },
 
   async create(idToken: string, data: { title: string, description: string | null }): Promise<InitiativeDetail> {
