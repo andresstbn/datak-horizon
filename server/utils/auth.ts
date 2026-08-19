@@ -65,8 +65,12 @@ export async function requireAuth(event: H3Event): Promise<VerifiedToken> {
 
   const verified = await verifyIdToken(token)
 
+  // The allowlist keys on the email, so the email must be proven. Firebase
+  // issues valid tokens for any provider enabled on the project, and a
+  // self-service one (e.g. email/password) would let anyone mint a token
+  // claiming an allowlisted address with `email_verified: false`.
   const customAllowlist = getRuntimeAuthAllowlist(event)
-  if (!verified.email || !isEmailAllowed(verified.email, customAllowlist)) {
+  if (!verified.email || !verified.emailVerified || !isEmailAllowed(verified.email, customAllowlist)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'Forbidden: user email is not authorized in Horizon allowlist'

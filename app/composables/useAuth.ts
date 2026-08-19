@@ -58,11 +58,16 @@ export function useAuth() {
       profile.value = await authService.fetchMe(token)
       isAccessDenied.value = false
       deniedEmail.value = null
-    } catch {
-      // 403 Forbidden or unauthorized: mark access as denied
+    } catch (error: unknown) {
+      // Only a 403 means the account is not allowlisted. Any other failure
+      // (network blip, 5xx, cold start) must not tell a legitimate user that
+      // their access was revoked.
       profile.value = null
-      isAccessDenied.value = true
-      deniedEmail.value = $firebaseAuth?.currentUser?.email ?? null
+      const status = (error as { statusCode?: number })?.statusCode
+      isAccessDenied.value = status === 403
+      deniedEmail.value = status === 403
+        ? ($firebaseAuth?.currentUser?.email ?? null)
+        : null
     }
   }
 

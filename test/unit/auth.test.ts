@@ -100,11 +100,25 @@ describe('auth utility', () => {
       })
     })
 
+    it('rejects with 403 when the email is allowlisted but not verified', async () => {
+      verifyIdTokenMock.mockResolvedValue({
+        uid: 'spoofed-uid',
+        email: 'daniel@datak.co',
+        name: 'Not Daniel',
+        email_verified: false
+      })
+
+      await expect(
+        requireAuth(makeEvent({ authorization: 'Bearer unverified-token' }))
+      ).rejects.toMatchObject({ statusCode: 403 })
+    })
+
     it('accepts an authorized user in the default allowlist', async () => {
       verifyIdTokenMock.mockResolvedValue({
         uid: 'user-daniel',
         email: 'daniel@datak.co',
-        name: 'Daniel Esteban'
+        name: 'Daniel Esteban',
+        email_verified: true
       })
 
       const result = await requireAuth(makeEvent({ authorization: 'Bearer good-token' }))
@@ -118,7 +132,8 @@ describe('auth utility', () => {
       verifyIdTokenMock.mockResolvedValue({
         uid: 'user-tania',
         email: 'TANIA@DATAK.CO',
-        name: 'Tania'
+        name: 'Tania',
+        email_verified: true
       })
 
       const result = await requireAuth(makeEvent({ authorization: 'Bearer good-token' }))
@@ -133,7 +148,8 @@ describe('auth utility', () => {
       verifyIdTokenMock.mockResolvedValue({
         uid: 'user-new',
         email: 'newcolleague@datak.co',
-        name: 'New Colleague'
+        name: 'New Colleague',
+        email_verified: true
       })
 
       const result = await requireAuth(makeEvent({ authorization: 'Bearer good-token' }))

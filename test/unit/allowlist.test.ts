@@ -11,7 +11,7 @@ describe('allowlist utility', () => {
   describe('normalizeEmail', () => {
     it('lowercases and trims email addresses', () => {
       expect(normalizeEmail('  DANIEL@Datak.Co  ')).toBe('daniel@datak.co')
-      expect(normalizeEmail('Ana@Datak.Example')).toBe('ana@datak.example')
+      expect(normalizeEmail('Tania@Datak.Co')).toBe('tania@datak.co')
     })
   })
 
@@ -29,19 +29,19 @@ describe('allowlist utility', () => {
   })
 
   describe('DEFAULT_ALLOWED_EMAILS', () => {
-    it('contains all audited production and seed users', () => {
-      const expected = [
+    it('contains exactly the audited real users', () => {
+      expect([...DEFAULT_ALLOWED_EMAILS]).toEqual([
         'daestebanc@gmail.com',
         'daniel@datak.co',
         'eduardo.luna@datak.co',
-        'tania@datak.co',
-        'ana@datak.example',
-        'luis@datak.example',
-        'marta@datak.example'
-      ]
+        'tania@datak.co'
+      ])
+    })
 
-      for (const email of expected) {
-        expect(DEFAULT_ALLOWED_EMAILS).toContain(email)
+    it('excludes the local seed users, which must not grant access', () => {
+      for (const email of ['ana@datak.example', 'luis@datak.example', 'marta@datak.example']) {
+        expect(DEFAULT_ALLOWED_EMAILS).not.toContain(email)
+        expect(isEmailAllowed(email)).toBe(false)
       }
     })
   })
@@ -62,7 +62,6 @@ describe('allowlist utility', () => {
       expect(isEmailAllowed('  tania@datak.co  ')).toBe(true)
       expect(isEmailAllowed('eduardo.luna@datak.co')).toBe(true)
       expect(isEmailAllowed('daestebanc@gmail.com')).toBe(true)
-      expect(isEmailAllowed('ana@datak.example')).toBe(true)
     })
 
     it('authorizes custom emails passed via runtime allowlist', () => {

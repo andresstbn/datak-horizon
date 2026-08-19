@@ -4,7 +4,7 @@ Plataforma interna de Datak: la **fuente única de verdad** para las iniciativas
 de producto e ingeniería. Centraliza necesidades, especificaciones vivas,
 decisiones (ADR), planificación y entrega.
 
-> **Estado Actual**: Esta versión cuenta con el primer núcleo funcional (MVP) de refinamiento colaborativo y preparación para IA completamente operativo. Consulta la carpeta [docs/](file:///Users/daniel/Datak/datak-services/datak-horizon/docs/) para obtener información detallada del diseño y objetivos del sistema.
+> **Estado Actual**: Esta versión cuenta con el primer núcleo funcional (MVP) de refinamiento colaborativo y preparación para IA completamente operativo. Consulta la carpeta [docs/](docs/) para obtener información detallada del diseño y objetivos del sistema.
 
 ## Stack
 
@@ -103,7 +103,7 @@ La autenticación se delega en **Firebase Authentication** con Google Sign-In, p
 La allowlist opera bajo dos mecanismos complementarios:
 
 1. **Lista base versionada en el repositorio:**
-   Ubicada en [`server/utils/allowlist.ts`](file:///Users/daniel/Datak/datak-services/datak-horizon/server/utils/allowlist.ts) (`DEFAULT_ALLOWED_EMAILS`). Contiene las cuentas de los miembros del equipo y semillas de desarrollo. Para autorizar un nuevo usuario de forma estándar:
+   Ubicada en [`server/utils/allowlist.ts`](server/utils/allowlist.ts) (`DEFAULT_ALLOWED_EMAILS`). Contiene únicamente las cuentas reales de los miembros del equipo. Los usuarios semilla de `server/db/seed.ts` no van aquí: solo pueblan la base local y no pueden iniciar sesión. Para desarrollo local usa `NUXT_AUTH_ALLOWLIST`. Para autorizar un nuevo usuario de forma estándar:
    - Añade el email al array `DEFAULT_ALLOWED_EMAILS` en `server/utils/allowlist.ts`.
    - Realiza un commit en una rama y abre un PR.
    - Tras la aprobación y merge a `main`, haz deploy a Cloud Run.

@@ -5,16 +5,14 @@
  * `NUXT_AUTH_ALLOWLIST` environment variable) and deploying the application.
  */
 export const DEFAULT_ALLOWED_EMAILS: readonly string[] = Object.freeze([
-  // Production users (from production database audit)
+  // Real users (from production database audit). Seed users from
+  // `server/db/seed.ts` are deliberately absent: they only populate the local
+  // database and cannot sign in (`.example` is a reserved TLD, so no Google
+  // account can exist there). Use `NUXT_AUTH_ALLOWLIST` for local overrides.
   'daestebanc@gmail.com',
   'daniel@datak.co',
   'eduardo.luna@datak.co',
-  'tania@datak.co',
-
-  // Local development / seed users
-  'ana@datak.example',
-  'luis@datak.example',
-  'marta@datak.example'
+  'tania@datak.co'
 ])
 
 /**
