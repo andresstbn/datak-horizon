@@ -30,11 +30,15 @@ export function useAuth() {
 
   const uid = useState<string | null>('auth:uid', () => null)
   const profile = useState<AppUser | null>('auth:profile', () => null)
+  const isAccessDenied = useState<boolean>('auth:isAccessDenied', () => false)
+  const deniedEmail = useState<string | null>('auth:deniedEmail', () => null)
+
   // `isReady` flips to true once Firebase has resolved the initial auth state.
   const isReady = useState<boolean>('auth:isReady', () => false)
   const isLoading = useState<boolean>('auth:isLoading', () => false)
 
   const isAuthenticated = computed(() => !!uid.value)
+  const isAuthorized = computed(() => !!profile.value && !isAccessDenied.value)
 
   /** Retrieve the current Firebase ID token, if signed in. */
   async function getIdToken(): Promise<string | null> {
@@ -46,13 +50,24 @@ export function useAuth() {
     const token = await getIdToken()
     if (!token) {
       profile.value = null
+      isAccessDenied.value = false
+      deniedEmail.value = null
       return
     }
     try {
       profile.value = await authService.fetchMe(token)
-    } catch {
-      // Token valid client-side but profile endpoint failed; keep the session.
+      isAccessDenied.value = false
+      deniedEmail.value = null
+    } catch (error: unknown) {
+      // Only a 403 means the account is not allowlisted. Any other failure
+      // (network blip, 5xx, cold start) must not tell a legitimate user that
+      // their access was revoked.
       profile.value = null
+      const status = (error as { statusCode?: number })?.statusCode
+      isAccessDenied.value = status === 403
+      deniedEmail.value = status === 403
+        ? ($firebaseAuth?.currentUser?.email ?? null)
+        : null
     }
   }
 
@@ -72,6 +87,8 @@ export function useAuth() {
         await fetchProfile()
       } else {
         profile.value = null
+        isAccessDenied.value = false
+        deniedEmail.value = null
       }
       isReady.value = true
     })
@@ -94,6 +111,8 @@ export function useAuth() {
     await signOut($firebaseAuth)
     uid.value = null
     profile.value = null
+    isAccessDenied.value = false
+    deniedEmail.value = null
   }
 
   return {
@@ -102,6 +121,9 @@ export function useAuth() {
     isReady,
     isLoading,
     isAuthenticated,
+    isAuthorized,
+    isAccessDenied,
+    deniedEmail,
     init,
     getIdToken,
     fetchProfile,

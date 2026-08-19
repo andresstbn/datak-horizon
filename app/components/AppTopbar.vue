@@ -4,15 +4,35 @@ defineProps<{
   pageTitle?: string
 }>()
 
-const { profile, isReady, isAuthenticated, isLoading, loginWithGoogle, logout } = useAuth()
+const {
+  profile,
+  isReady,
+  isAuthenticated,
+  isAccessDenied,
+  deniedEmail,
+  isLoading,
+  loginWithGoogle,
+  logout
+} = useAuth()
 
 const accountItems = computed(() => [
   [
     {
-      label: profile.value?.displayName ?? profile.value?.email ?? 'Cuenta',
+      label: profile.value?.displayName ?? profile.value?.email ?? deniedEmail.value ?? 'Cuenta',
       type: 'label' as const
     }
   ],
+  ...(isAccessDenied.value
+    ? [
+        [
+          {
+            label: 'Acceso restringido',
+            icon: 'i-lucide-shield-alert',
+            disabled: true
+          }
+        ]
+      ]
+    : []),
   [
     {
       label: 'Cerrar sesión',
@@ -40,7 +60,7 @@ header(class="flex h-[60px] shrink-0 items-center gap-3 border-b border-default 
     UDropdownMenu(v-else-if="isAuthenticated" :items="accountItems")
       UAvatar(
         :src="profile?.photoUrl ?? undefined"
-        :alt="profile?.displayName ?? profile?.email ?? 'Cuenta'"
+        :alt="profile?.displayName ?? profile?.email ?? deniedEmail ?? 'Cuenta'"
         size="sm"
       )
 

@@ -15,7 +15,7 @@ import { initiativeService } from '~/services/initiativeService'
 
 definePageMeta({ pageTitle: 'Horizon Dashboard' })
 
-const { isAuthenticated, isReady, getIdToken } = useAuth()
+const { isAuthenticated, isAuthorized, isAccessDenied, deniedEmail, isReady, getIdToken, logout } = useAuth()
 const {
   isLoading: isInitiativesLoading,
   errorMessage: initiativesError,
@@ -205,9 +205,9 @@ async function handleCreate() {
 }
 
 watch(
-  () => isAuthenticated.value,
-  async (authed) => {
-    if (authed) {
+  () => isAuthorized.value,
+  async (authorized) => {
+    if (authorized) {
       await Promise.all([
         fetchInitiatives(),
         fetchUsers(),
@@ -234,7 +234,24 @@ watch(
     description="Entra con tu cuenta de Google para acceder a Datak Horizon."
   )
 
-  template(v-else)
+  .space-y-4(v-else-if="isAccessDenied")
+    UAlert(
+      color="error"
+      variant="subtle"
+      icon="i-lucide-shield-alert"
+      title="Acceso restringido"
+      :description="`Tu cuenta de Google (${deniedEmail ?? 'autenticada'}) no está autorizada para acceder a Datak Horizon. Si necesitas acceso, solicita autorización al equipo de administración.`"
+    )
+    .flex.justify-start
+      UButton(
+        icon="i-lucide-log-out"
+        label="Cerrar sesión"
+        color="neutral"
+        variant="outline"
+        @click="logout"
+      )
+
+  template(v-else-if="isAuthorized")
     //- Top Navigation and Actions
     .flex.flex-wrap.items-center.justify-between.gap-4.pb-4.border-b.border-default
       .space-y-1
