@@ -12,6 +12,23 @@ const { isReady, isAuthenticated, getIdToken } = useAuth()
 const { initiative, isLoading, errorMessage, fetchInitiative } = useInitiative(id)
 const toast = useToast()
 
+const { data: preview } = await useAsyncData(
+  `initiative-preview:${id}`,
+  () => initiativeService.getPublicPreview(id).catch(() => null)
+)
+
+const previewTitle = computed(() =>
+  preview.value?.title ? `${preview.value.title} · Datak Horizon` : 'Iniciativa · Datak Horizon'
+)
+
+useSeoMeta({
+  title: previewTitle,
+  ogTitle: previewTitle,
+  ogSiteName: 'Datak Horizon',
+  description: () => undefined,
+  ogDescription: () => undefined
+})
+
 const tabItems = [
   { label: 'Resumen', value: 'resumen', slot: 'resumen', icon: 'i-lucide-file-text' },
   { label: 'Conversaciones', value: 'conversations', slot: 'conversations', icon: 'i-lucide-message-square' },
@@ -46,6 +63,25 @@ watch(activeTab, (newVal) => {
     router.replace({ query: { ...route.query, tab: newVal } })
   }
 })
+
+async function handleCopyLink() {
+  try {
+    const url = `${window.location.origin}/iniciativas/${id}`
+    await navigator.clipboard.writeText(url)
+    toast.add({
+      title: 'Enlace copiado',
+      description: 'El enlace de la iniciativa se copió al portapapeles.',
+      icon: 'i-lucide-check'
+    })
+  } catch {
+    toast.add({
+      title: 'Error',
+      description: 'No se pudo copiar el enlace al portapapeles.',
+      color: 'error',
+      icon: 'i-lucide-triangle-alert'
+    })
+  }
+}
 
 async function handleCopyContext() {
   const token = await getIdToken()
@@ -108,7 +144,7 @@ watch(
       UIcon.size-6.animate-spin.text-muted(name="i-lucide-loader-circle")
 
     template(v-else-if="initiative")
-      //- Header: back, title, status, and Copy Context button
+      //- Header: back, title, status, Copy Link and Copy Context buttons
       .flex.flex-wrap.items-center.gap-3.pb-2.border-b.border-default
         UButton(
           to="/"
@@ -125,7 +161,15 @@ watch(
           variant="subtle"
         )
 
-        .ml-auto
+        .ml-auto.flex.items-center.gap-2
+          UButton(
+            icon="i-lucide-link"
+            label="Copiar enlace"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            @click="handleCopyLink"
+          )
           UButton(
             icon="i-lucide-copy"
             label="Copiar Contexto"
