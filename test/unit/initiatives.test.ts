@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   createDefaultFilters,
-  type InitiativeListItem
+  type InitiativeListItem,
+  type InitiativeStatus
 } from '../../shared/types/initiative'
 import {
+  filterActiveInitiatives,
   filterInitiatives,
   formatInitiativeDate,
   formatRelativeTime,
@@ -18,6 +20,7 @@ function makeItem(overrides: Partial<InitiativeListItem> = {}): InitiativeListIt
     id: overrides.id ?? 'id-1',
     title: 'Portal único de clientes',
     slug: 'portal',
+    description: null,
     status: 'in_development',
     priority: 'high',
     risk: 'medium',
@@ -91,5 +94,19 @@ describe('initiative helpers', () => {
 
     const empty = paginate([], 1, 8)
     expect(empty).toMatchObject({ from: 0, to: 0, total: 0 })
+  })
+
+  it('filters the dashboard list by selected statuses and searches description too', () => {
+    const items = [
+      makeItem({ id: 'a', title: 'Alpha', status: 'in_development' }),
+      makeItem({ id: 'b', title: 'Beta', status: 'ready' }),
+      makeItem({ id: 'c', title: 'Gamma', status: 'in_development', description: 'cartera vencida' })
+    ]
+    const active: InitiativeStatus[] = ['in_development']
+
+    expect(filterActiveInitiatives(items, active, '').map(i => i.id)).toEqual(['a', 'c'])
+    expect(filterActiveInitiatives(items, ['ready'], '').map(i => i.id)).toEqual(['b'])
+    expect(filterActiveInitiatives(items, active, 'CARTERA').map(i => i.id)).toEqual(['c'])
+    expect(filterActiveInitiatives(items, active, 'beta')).toEqual([])
   })
 })

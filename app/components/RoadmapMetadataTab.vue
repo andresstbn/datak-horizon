@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { initiativeService } from '~/services/initiativeService'
+import { userService } from '~/services/userService'
 import type { InitiativeDetail, OwnerRef } from '~~/shared/types/initiative'
 
 const props = defineProps<{
@@ -79,9 +80,7 @@ async function fetchUsers() {
   const token = await getIdToken()
   if (!token) return
   try {
-    usersList.value = await $fetch('/api/users', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    usersList.value = await userService.list(token)
   } catch (error) {
     console.error('Error fetching users:', error)
   }

@@ -1,6 +1,8 @@
 import { initiativeService } from '~/services/initiativeService'
+import { userService } from '~/services/userService'
 import {
   createDefaultFilters,
+  type InitiativeDetail,
   type InitiativeFilters,
   type InitiativeListItem,
   type OwnerRef
@@ -17,6 +19,8 @@ export function useInitiatives() {
   const { getIdToken } = useAuth()
 
   const items = useState<InitiativeListItem[]>('initiatives:items', () => [])
+  const users = useState<OwnerRef[]>('workspace:users', () => [])
+  const isUsersLoading = useState<boolean>('workspace:usersLoading', () => false)
   const isLoading = useState<boolean>('initiatives:loading', () => false)
   const errorMessage = useState<string | null>('initiatives:error', () => null)
   const filters = useState<InitiativeFilters>('initiatives:filters', createDefaultFilters)
@@ -41,6 +45,24 @@ export function useInitiatives() {
     }
   }
 
+  // Every owner dropdown asks for the list on mount, so guard it: one request
+  // per session instead of one per rendered row.
+  async function fetchUsers(): Promise<void> {
+    if (users.value.length > 0 || isUsersLoading.value) return
+
+    const token = await getIdToken()
+    if (!token) return
+
+    isUsersLoading.value = true
+    try {
+      users.value = await userService.list(token)
+    } catch (err) {
+      console.error('Error loading users:', err)
+    } finally {
+      isUsersLoading.value = false
+    }
+  }
+
   const filtered = computed(() => filterInitiatives(items.value, filters.value))
   const paginated = computed(() => paginate(filtered.value, page.value, PER_PAGE))
 
@@ -62,29 +84,38 @@ export function useInitiatives() {
     page.value = 1
   }, { deep: true })
 
-  async function updateInitiativeStatus(id: string, newStatus: InitiativeListItem['status']): Promise<boolean> {
+  async function updateInitiative(
+    id: string,
+    patch: Partial<InitiativeDetail>
+  ): Promise<InitiativeDetail | null> {
     const token = await getIdToken()
-    if (!token) return false
+    if (!token) return null
 
     try {
-      const updated = await initiativeService.update(token, id, { status: newStatus })
+      const updated = await initiativeService.update(token, id, patch)
       const index = items.value.findIndex(item => item.id === id)
       const currentItem = items.value[index]
       if (index !== -1 && currentItem) {
         items.value[index] = {
           ...currentItem,
-          status: updated.status
+          ...updated
         }
       }
-      return true
+      return updated
     } catch (error) {
-      console.error('Error updating initiative status:', error)
-      return false
+      console.error('Error updating initiative:', error)
+      return null
     }
+  }
+
+  async function updateInitiativeStatus(id: string, newStatus: InitiativeListItem['status']): Promise<boolean> {
+    const result = await updateInitiative(id, { status: newStatus })
+    return result !== null
   }
 
   return {
     items,
+    users,
     isLoading,
     errorMessage,
     filters,
@@ -94,6 +125,8 @@ export function useInitiatives() {
     paginated,
     owners,
     fetchInitiatives,
+    fetchUsers,
+    updateInitiative,
     updateInitiativeStatus
   }
 }

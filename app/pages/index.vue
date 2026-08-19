@@ -2,7 +2,13 @@
 import type { Conversation } from '~~/shared/types/conversation'
 import type { Requirement } from '~~/shared/types/requirement'
 import type { InitiativeStatus } from '~~/shared/types/initiative'
-import { statusBadge, healthBadge, priorityBadge } from '~~/shared/utils/initiatives'
+import {
+  statusBadge,
+  healthBadge,
+  priorityBadge,
+  formatInitiativeDate,
+  filterActiveInitiatives
+} from '~~/shared/utils/initiatives'
 import { conversationService } from '~/services/conversationService'
 import { requirementService } from '~/services/requirementService'
 import { initiativeService } from '~/services/initiativeService'
@@ -19,12 +25,15 @@ const {
   paginated,
   owners,
   fetchInitiatives,
+  fetchUsers,
   items: initiativesList
 } = useInitiatives()
 
 const activeTab = useState<'dashboard' | 'roadmap'>('home:activeTab', () => 'dashboard')
+const dashboardSubTab = useState<'initiatives' | 'conversations' | 'requirements'>('home:dashboardSubTab', () => 'initiatives')
 const createOpen = ref(false)
 const isSubmitting = ref(false)
+const initiativeSearch = ref('')
 
 const newInitiative = ref({
   title: '',
@@ -47,10 +56,10 @@ const ALL_STATUS_OPTIONS: { label: string, value: InitiativeStatus }[] = [
   { label: 'Cancelado', value: 'cancelled' }
 ]
 
+// Exclude 'ready' by default so ready initiatives are hidden unless toggled
 const DEFAULT_ACTIVE_STATUSES: InitiativeStatus[] = [
   'discovery',
   'refinement',
-  'ready',
   'in_development',
   'qa',
   'blocked'
@@ -61,16 +70,27 @@ const selectedStatuses = useState<InitiativeStatus[]>(
   () => [...DEFAULT_ACTIVE_STATUSES]
 )
 
+const isReadyShown = computed({
+  get: () => selectedStatuses.value.includes('ready'),
+  set: (show: boolean) => {
+    if (show && !selectedStatuses.value.includes('ready')) {
+      selectedStatuses.value = [...selectedStatuses.value, 'ready']
+    } else if (!show && selectedStatuses.value.includes('ready')) {
+      selectedStatuses.value = selectedStatuses.value.filter(s => s !== 'ready')
+    }
+  }
+})
+
+function toggleReadyStatus() {
+  isReadyShown.value = !isReadyShown.value
+}
+
 function selectAllStatuses() {
   selectedStatuses.value = ALL_STATUS_OPTIONS.map(opt => opt.value)
 }
 
 function selectDefaultActive() {
   selectedStatuses.value = [...DEFAULT_ACTIVE_STATUSES]
-}
-
-function selectWithoutQa() {
-  selectedStatuses.value = DEFAULT_ACTIVE_STATUSES.filter(s => s !== 'qa')
 }
 
 function toggleStatus(status: InitiativeStatus) {
@@ -100,12 +120,28 @@ const statusCounts = computed(() => {
   return counts
 })
 
-// Filtered active initiatives
-const activeInitiatives = computed(() => {
-  return initiativesList.value.filter(item =>
-    selectedStatuses.value.includes(item.status)
-  )
-})
+// Filtered active initiatives based on selected statuses and search term
+const activeInitiatives = computed(() =>
+  filterActiveInitiatives(initiativesList.value, selectedStatuses.value, initiativeSearch.value)
+)
+
+const dashboardTabItems = computed(() => [
+  {
+    label: `Iniciativas Activas (${activeInitiatives.value.length})`,
+    value: 'initiatives',
+    icon: 'i-lucide-rocket'
+  },
+  {
+    label: `Conversaciones Recientes (${recentConversations.value.length})`,
+    value: 'conversations',
+    icon: 'i-lucide-messages-square'
+  },
+  {
+    label: `Requerimientos en Refinamiento (${refiningRequirements.value.length})`,
+    value: 'requirements',
+    icon: 'i-lucide-list-todo'
+  }
+])
 
 async function fetchDashboardData() {
   const token = await getIdToken()
@@ -172,8 +208,11 @@ watch(
   () => isAuthenticated.value,
   async (authed) => {
     if (authed) {
-      await fetchInitiatives()
-      await fetchDashboardData()
+      await Promise.all([
+        fetchInitiatives(),
+        fetchUsers(),
+        fetchDashboardData()
+      ])
     }
   },
   { immediate: true }
@@ -226,128 +265,270 @@ watch(
           @click="createOpen = true"
         )
 
-    //- 1. DASHBOARD VIEW
+    //- 1. DASHBOARD VIEW WITH FULL-WIDTH TABS
     template(v-if="activeTab === 'dashboard'")
-      .grid.grid-cols-1.gap-6(class="lg:grid-cols-3")
-        //- Column 1: Active Initiatives
-        UPageCard
-          template(#header)
-            .flex.items-center.justify-between.gap-2.w-full
-              div(class="space-y-0.5")
-                h3.text-base.font-semibold Iniciativas Activas
-                p.text-xs.text-muted Esfuerzos en curso ({{ activeInitiatives.length }} de {{ initiativesList.length }})
-              UPopover
-                UButton(
-                  icon="i-lucide-filter"
-                  :label="`Filtro (${selectedStatuses.length})`"
-                  size="xs"
-                  color="neutral"
-                  variant="subtle"
+      .space-y-4
+        //- Main horizontal tabs for dashboard sections
+        UTabs(
+          v-model="dashboardSubTab"
+          :items="dashboardTabItems"
+          variant="link"
+          :ui="{ root: 'gap-4' }"
+        )
+
+        //- TAB 1: INICIATIVAS ACTIVAS (Full Width)
+        template(v-if="dashboardSubTab === 'initiatives'")
+          UPageCard
+            template(#header)
+              //- Toolbar / Barrita de tareas
+              .flex.flex-wrap.items-center.justify-between.gap-3.w-full
+                .flex.flex-wrap.items-center.gap-2
+                  //- Search box
+                  UInput(
+                    v-model="initiativeSearch"
+                    placeholder="Buscar iniciativa..."
+                    icon="i-lucide-search"
+                    size="sm"
+                    class="w-56 sm:w-64"
+                  )
+
+                  //- Show/Hide Ready (Listas) Toolbar Action Button
+                  UButton(
+                    :icon="isReadyShown ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+                    :label="isReadyShown ? 'Ocultar listas' : 'Mostrar listas'"
+                    :color="isReadyShown ? 'primary' : 'neutral'"
+                    :variant="isReadyShown ? 'subtle' : 'outline'"
+                    size="sm"
+                    @click="toggleReadyStatus"
+                  )
+                    template(#trailing)
+                      UBadge(
+                        :label="String(statusCounts.ready || 0)"
+                        size="xs"
+                        :color="isReadyShown ? 'primary' : 'neutral'"
+                        variant="subtle"
+                      )
+
+                  //- Status Filters Popover
+                  UPopover
+                    UButton(
+                      icon="i-lucide-filter"
+                      :label="`Filtro (${selectedStatuses.length})`"
+                      size="sm"
+                      color="neutral"
+                      variant="outline"
+                    )
+                    template(#content)
+                      .p-3.space-y-3.w-64
+                        .flex.items-center.justify-between.border-b.border-default.pb-2
+                          span.text-xs.font-semibold Filtrar estados
+                          .flex.items-center.gap-1
+                            UButton(label="Sin Listas" size="xs" variant="ghost" color="neutral" @click="selectDefaultActive")
+                            UButton(label="Todos" size="xs" variant="ghost" color="neutral" @click="selectAllStatuses")
+
+                        .space-y-2
+                          .flex.items-center.justify-between(v-for="opt in ALL_STATUS_OPTIONS" :key="opt.value")
+                            UCheckbox(
+                              :model-value="selectedStatuses.includes(opt.value)"
+                              :label="opt.label"
+                              size="sm"
+                              @update:model-value="toggleStatus(opt.value)"
+                            )
+                            UBadge(
+                              :color="statusBadge(opt.value).color"
+                              :label="String(statusCounts[opt.value] || 0)"
+                              size="xs"
+                              variant="subtle"
+                            )
+
+                .flex.items-center.gap-2.text-xs.text-muted
+                  span Mostrando {{ activeInitiatives.length }} de {{ initiativesList.length }} iniciativas
+
+            //- Initiatives list body
+            .space-y-4
+              .flex.items-center.justify-center.py-12(v-if="isInitiativesLoading")
+                UIcon.size-6.animate-spin.text-muted(name="i-lucide-loader-circle")
+
+              .text-center.py-12.space-y-3(v-else-if="activeInitiatives.length === 0")
+                UIcon.size-8.text-muted.mx-auto(name="i-lucide-folder-search")
+                p.text-sm.text-dimmed No hay iniciativas con los filtros aplicados.
+                .flex.items-center.justify-center.gap-2
+                  UButton(
+                    v-if="!isReadyShown && statusCounts.ready > 0"
+                    label="Mostrar iniciativas listas"
+                    icon="i-lucide-eye"
+                    size="xs"
+                    color="primary"
+                    variant="soft"
+                    @click="toggleReadyStatus"
+                  )
+                  UButton(
+                    label="Restablecer filtros"
+                    size="xs"
+                    color="neutral"
+                    variant="outline"
+                    @click="selectDefaultActive"
+                  )
+
+              //- Columnar Table Layout for Active Initiatives
+              .overflow-x-auto(v-else)
+                .min-w-full.inline-block.align-middle
+                  .border.border-default.rounded-lg.overflow-hidden
+                    //- Table Header
+                    .grid.items-center.gap-3.px-4.py-2.bg-muted.border-b.border-default.text-xs.font-semibold.text-muted(
+                      class="bg-opacity-40 min-w-[760px] grid-cols-[1fr_120px_170px_140px_100px_40px]"
+                    )
+                      span Iniciativa
+                      span.text-center Prioridad
+                      span.text-left Resp. Técnico
+                      span.text-center Estado
+                      span.text-center Salud
+                      span
+
+                    //- Table Rows
+                    ul.divide-y.divide-default(class="min-w-[760px]")
+                      li.transition(
+                        class="hover:bg-elevated/40 px-4 py-3"
+                        v-for="item in activeInitiatives"
+                        :key="item.id"
+                      )
+                        .grid.items-center.gap-3(class="grid-cols-[1fr_120px_170px_140px_100px_40px]")
+                          //- Iniciativa Column
+                          .min-w-0.pr-2(class="space-y-0.5")
+                            .flex.items-center.gap-2.flex-wrap
+                              ULink.font-semibold.text-sm.text-foreground(
+                                class="hover:underline hover:text-primary"
+                                :to="`/iniciativas/${item.id}`"
+                              ) {{ item.title }}
+                              span.text-xs.text-dimmed(v-if="item.createdAt") · Creada el {{ formatInitiativeDate(item.createdAt) }}
+
+                            p.text-xs.text-muted.line-clamp-1(v-if="item.description") {{ item.description }}
+
+                          //- Prioridad Column
+                          .flex.justify-center
+                            InitiativePriorityBadge(
+                              :priority="item.priority"
+                              :initiative-id="item.id"
+                            )
+
+                          //- Resp. Técnico Column (Technical Owner)
+                          .flex.justify-start
+                            InitiativeOwnerSelect(
+                              :owner="item.technicalOwner"
+                              :initiative-id="item.id"
+                              field="technicalOwnerId"
+                            )
+
+                          //- Estado Column
+                          .flex.justify-center
+                            InitiativeStatusBadge(
+                              :status="item.status"
+                              :initiative-id="item.id"
+                              :initiative-title="item.title"
+                              @updated="fetchDashboardData"
+                            )
+
+                          //- Salud Column
+                          .flex.justify-center
+                            UBadge(
+                              :color="healthBadge(item.health).color"
+                              :label="healthBadge(item.health).label"
+                              size="sm"
+                              variant="subtle"
+                            )
+
+                          //- Acción Column
+                          .flex.justify-end
+                            UButton(
+                              icon="i-lucide-chevron-right"
+                              color="neutral"
+                              variant="ghost"
+                              size="xs"
+                              :to="`/iniciativas/${item.id}`"
+                              aria-label="Ver iniciativa"
+                            )
+
+        //- TAB 2: CONVERSACIONES RECIENTES (Full Width)
+        template(v-else-if="dashboardSubTab === 'conversations'")
+          UPageCard(title="Conversaciones Recientes")
+            template(#description)
+              p.text-xs.text-muted Historial de hilos de discusión y acuerdos en todas las iniciativas.
+
+            .space-y-4
+              .flex.items-center.justify-center.py-12(v-if="isDashboardLoading")
+                UIcon.size-6.animate-spin.text-muted(name="i-lucide-loader-circle")
+
+              p.text-sm.text-dimmed.text-center.py-12(v-else-if="recentConversations.length === 0") Sin conversaciones registradas.
+
+              ul.divide-y.divide-default(v-else)
+                li.transition(
+                  class="py-3.5 first:pt-0 last:pb-0 hover:bg-elevated/40 rounded-lg px-2"
+                  v-for="conv in recentConversations"
+                  :key="conv.id"
                 )
-                template(#content)
-                  .p-3.space-y-3.w-64
-                    .flex.items-center.justify-between.border-b.border-default.pb-2
-                      span.text-xs.font-semibold Filtrar estados
-                      .flex.items-center.gap-1
-                        UButton(label="Sin QA" size="xs" variant="ghost" color="neutral" @click="selectWithoutQa")
-                        UButton(label="Todos" size="xs" variant="ghost" color="neutral" @click="selectAllStatuses")
+                  .flex.items-center.justify-between.gap-3
+                    .min-w-0.space-y-1.flex-1
+                      .flex.items-center.gap-2.flex-wrap
+                        ULink.font-semibold.text-base.text-foreground(
+                          class="hover:underline hover:text-primary"
+                          :to="`/iniciativas/${conv.initiativeId}?tab=conversations`"
+                        ) {{ conv.title }}
+                        UBadge(color="neutral" variant="subtle" size="xs") {{ conv.source }}
+                      p.text-xs.text-muted
+                        | Iniciativa:
+                        span.font-medium.text-foreground {{ ` ${conv.initiativeTitle || '—'} ` }}
 
-                    .space-y-2
-                      .flex.items-center.justify-between(v-for="opt in ALL_STATUS_OPTIONS" :key="opt.value")
-                        UCheckbox(
-                          :model-value="selectedStatuses.includes(opt.value)"
-                          :label="opt.label"
-                          size="sm"
-                          @update:model-value="toggleStatus(opt.value)"
-                        )
-                        UBadge(
-                          :color="statusBadge(opt.value).color"
-                          :label="String(statusCounts[opt.value] || 0)"
-                          size="xs"
-                          variant="subtle"
-                        )
-
-          .space-y-4
-            .flex.items-center.justify-center.py-8(v-if="isInitiativesLoading")
-              UIcon.size-5.animate-spin.text-muted(name="i-lucide-loader-circle")
-
-            .text-center.py-8.space-y-2(v-else-if="activeInitiatives.length === 0")
-              p.text-sm.text-dimmed No hay iniciativas con los estados seleccionados.
-              UButton(
-                label="Restablecer filtros"
-                size="xs"
-                color="neutral"
-                variant="outline"
-                @click="selectDefaultActive"
-              )
-
-            ul.divide-y.divide-default(v-else)
-              li.py-3(class="first:pt-0 last:pb-0" v-for="item in activeInitiatives" :key="item.id")
-                .flex.items-start.justify-between.gap-3
-                  .min-w-0.space-y-1
-                    ULink.font-semibold.text-sm(class="hover:underline" :to="`/iniciativas/${item.id}`") {{ item.title }}
-                    p.text-xs.text-muted.truncate(v-if="item.description") {{ item.description }}
-                  .flex.flex-col.items-end.gap-1.shrink-0
-                    InitiativeStatusBadge(
-                      :status="item.status"
-                      :initiative-id="item.id"
-                      :initiative-title="item.title"
-                      @updated="fetchDashboardData"
-                    )
-                    UBadge(
-                      :color="healthBadge(item.health).color"
-                      :label="healthBadge(item.health).label"
-                      size="sm"
-                      variant="subtle"
+                    UButton(
+                      icon="i-lucide-arrow-right"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      :to="`/iniciativas/${conv.initiativeId}?tab=conversations`"
                     )
 
-        //- Column 2: Recent Conversations
-        UPageCard(title="Conversaciones Recientes")
-          template(#description)
-            p.text-xs.text-muted Los hilos de discusión más recientes.
+        //- TAB 3: REQUERIMIENTOS EN REFINAMIENTO (Full Width)
+        template(v-else-if="dashboardSubTab === 'requirements'")
+          UPageCard(title="Requerimientos en Refinamiento")
+            template(#description)
+              p.text-xs.text-muted Tareas y funcionalidades pendientes de maduración técnica y funcional.
 
-          .space-y-4
-            .flex.items-center.justify-center.py-8(v-if="isDashboardLoading")
-              UIcon.size-5.animate-spin.text-muted(name="i-lucide-loader-circle")
+            .space-y-4
+              .flex.items-center.justify-center.py-12(v-if="isDashboardLoading")
+                UIcon.size-6.animate-spin.text-muted(name="i-lucide-loader-circle")
 
-            p.text-sm.text-dimmed(v-else-if="recentConversations.length === 0") Sin conversaciones registradas.
+              p.text-sm.text-dimmed.text-center.py-12(v-else-if="refiningRequirements.length === 0") Sin requerimientos en refinamiento.
 
-            ul.divide-y.divide-default(v-else)
-              li.py-3(class="first:pt-0 last:pb-0" v-for="conv in recentConversations" :key="conv.id")
-                .space-y-1
-                  .flex.items-center.justify-between.gap-2
-                    ULink.font-semibold.text-sm(class="hover:underline" :to="`/iniciativas/${conv.initiativeId}?tab=conversations`") {{ conv.title }}
-                    UBadge(color="neutral" variant="subtle" size="sm") {{ conv.source }}
-                  p.text-xs.text-muted
-                    | Iniciativa:
-                    span.font-medium {{ conv.initiativeTitle || '—' }}
+              ul.divide-y.divide-default(v-else)
+                li.transition(
+                  class="py-3.5 first:pt-0 last:pb-0 hover:bg-elevated/40 rounded-lg px-2"
+                  v-for="req in refiningRequirements"
+                  :key="req.id"
+                )
+                  .flex.items-center.justify-between.gap-3
+                    .min-w-0.space-y-1.flex-1
+                      .flex.items-center.gap-2.flex-wrap
+                        ULink.font-semibold.text-base.text-foreground(
+                          class="hover:underline hover:text-primary"
+                          :to="`/iniciativas/${req.initiativeId}?tab=requirements`"
+                        ) {{ req.title }}
+                      p.text-xs.text-muted
+                        | Iniciativa:
+                        span.font-medium.text-foreground {{ ` ${req.initiativeTitle || '—'} ` }}
 
-        //- Column 3: Requirements in Refinement
-        UPageCard(title="Requerimientos en Refinamiento")
-          template(#description)
-            p.text-xs.text-muted Tareas y funcionalidades pendientes de maduración.
-
-          .space-y-4
-            .flex.items-center.justify-center.py-8(v-if="isDashboardLoading")
-              UIcon.size-5.animate-spin.text-muted(name="i-lucide-loader-circle")
-
-            p.text-sm.text-dimmed(v-else-if="refiningRequirements.length === 0") Sin requerimientos en refinamiento.
-
-            ul.divide-y.divide-default(v-else)
-              li.py-3(class="first:pt-0 last:pb-0" v-for="req in refiningRequirements" :key="req.id")
-                .flex.items-start.justify-between.gap-3
-                  .min-w-0.space-y-1
-                    ULink.font-semibold.text-sm(class="hover:underline" :to="`/iniciativas/${req.initiativeId}?tab=requirements`") {{ req.title }}
-                    p.text-xs.text-muted
-                      | Iniciativa:
-                      span.font-medium {{ req.initiativeTitle || '—' }}
-                  .flex.flex-col.items-end.gap-1.shrink-0
-                    UBadge(
-                      :color="priorityBadge(req.priority).color"
-                      :label="priorityBadge(req.priority).label"
-                      size="sm"
-                      variant="subtle"
-                    )
+                    .flex.items-center.gap-3.shrink-0
+                      UBadge(
+                        :color="priorityBadge(req.priority).color"
+                        :label="priorityBadge(req.priority).label"
+                        size="sm"
+                        variant="subtle"
+                      )
+                      UButton(
+                        icon="i-lucide-arrow-right"
+                        color="neutral"
+                        variant="ghost"
+                        size="xs"
+                        :to="`/iniciativas/${req.initiativeId}?tab=requirements`"
+                      )
 
     //- 2. ROADMAP VIEW
     template(v-else)
