@@ -29,6 +29,7 @@ function toListItem(row: InitiativeWithOwners): InitiativeListItem {
     id: row.id,
     title: row.title,
     slug: row.slug,
+    description: row.description,
     status: row.status,
     priority: row.priority,
     risk: row.risk,
