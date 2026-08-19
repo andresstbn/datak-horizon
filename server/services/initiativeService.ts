@@ -8,6 +8,7 @@ import { slackService } from './slackService'
 import type {
   InitiativeDetail,
   InitiativeListItem,
+  InitiativePublicPreview,
   OwnerRef
 } from '../../shared/types/initiative'
 import type { NewInitiative } from '../db/schema'
@@ -63,6 +64,15 @@ export const initiativeService = {
   async getById(id: string): Promise<InitiativeDetail | null> {
     const row = await initiativeRepository.findById(id)
     return row ? toDetail(row) : null
+  },
+
+  async getPublicPreview(id: string): Promise<InitiativePublicPreview | null> {
+    const row = await initiativeRepository.findTitleById(id)
+    if (!row) return null
+    return {
+      id: row.id,
+      title: row.title
+    }
   },
 
   async create(data: Omit<NewInitiative, 'slug'>, userId: string): Promise<InitiativeDetail> {

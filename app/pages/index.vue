@@ -204,6 +204,25 @@ async function handleCreate() {
   }
 }
 
+async function handleCopyLink(id: string) {
+  try {
+    const url = `${window.location.origin}/iniciativas/${id}`
+    await navigator.clipboard.writeText(url)
+    toast.add({
+      title: 'Enlace copiado',
+      description: 'El enlace de la iniciativa se copió al portapapeles.',
+      icon: 'i-lucide-check'
+    })
+  } catch {
+    toast.add({
+      title: 'Error',
+      description: 'No se pudo copiar el enlace al portapapeles.',
+      color: 'error',
+      icon: 'i-lucide-triangle-alert'
+    })
+  }
+}
+
 watch(
   () => isAuthorized.value,
   async (authorized) => {
@@ -393,7 +412,7 @@ watch(
                   .border.border-default.rounded-lg.overflow-hidden
                     //- Table Header
                     .grid.items-center.gap-3.px-4.py-2.bg-muted.border-b.border-default.text-xs.font-semibold.text-muted(
-                      class="bg-opacity-40 min-w-[760px] grid-cols-[1fr_120px_170px_140px_100px_40px]"
+                      class="bg-opacity-40 min-w-[760px] grid-cols-[1fr_120px_170px_140px_100px_70px]"
                     )
                       span Iniciativa
                       span.text-center Prioridad
@@ -409,7 +428,7 @@ watch(
                         v-for="item in activeInitiatives"
                         :key="item.id"
                       )
-                        .grid.items-center.gap-3(class="grid-cols-[1fr_120px_170px_140px_100px_40px]")
+                        .grid.items-center.gap-3(class="grid-cols-[1fr_120px_170px_140px_100px_70px]")
                           //- Iniciativa Column
                           .min-w-0.pr-2(class="space-y-0.5")
                             .flex.items-center.gap-2.flex-wrap
@@ -455,7 +474,15 @@ watch(
                             )
 
                           //- Acción Column
-                          .flex.justify-end
+                          .flex.items-center.justify-end.gap-1
+                            UButton(
+                              icon="i-lucide-link"
+                              color="neutral"
+                              variant="ghost"
+                              size="xs"
+                              aria-label="Copiar enlace"
+                              @click="handleCopyLink(item.id)"
+                            )
                             UButton(
                               icon="i-lucide-chevron-right"
                               color="neutral"
