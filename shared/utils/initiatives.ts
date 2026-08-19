@@ -169,3 +169,26 @@ export function paginate<T>(items: T[], page: number, perPage: number): Paginate
     to: start + rows.length
   }
 }
+
+/**
+ * Dashboard list filter: keep the initiatives whose status is selected and
+ * whose title or description matches the free-text search. Pure.
+ */
+export function filterActiveInitiatives(
+  items: InitiativeListItem[],
+  statuses: InitiativeStatus[],
+  search: string
+): InitiativeListItem[] {
+  const query = search.trim().toLowerCase()
+
+  return items.filter((item) => {
+    if (!statuses.includes(item.status)) {
+      return false
+    }
+    if (!query) {
+      return true
+    }
+    return item.title.toLowerCase().includes(query)
+      || (item.description?.toLowerCase().includes(query) ?? false)
+  })
+}

@@ -6,7 +6,8 @@ import {
   statusBadge,
   healthBadge,
   priorityBadge,
-  formatInitiativeDate
+  formatInitiativeDate,
+  filterActiveInitiatives
 } from '~~/shared/utils/initiatives'
 import { conversationService } from '~/services/conversationService'
 import { requirementService } from '~/services/requirementService'
@@ -92,10 +93,6 @@ function selectDefaultActive() {
   selectedStatuses.value = [...DEFAULT_ACTIVE_STATUSES]
 }
 
-function selectWithoutQa() {
-  selectedStatuses.value = DEFAULT_ACTIVE_STATUSES.filter(s => s !== 'qa')
-}
-
 function toggleStatus(status: InitiativeStatus) {
   if (selectedStatuses.value.includes(status)) {
     selectedStatuses.value = selectedStatuses.value.filter(s => s !== status)
@@ -124,22 +121,9 @@ const statusCounts = computed(() => {
 })
 
 // Filtered active initiatives based on selected statuses and search term
-const activeInitiatives = computed(() => {
-  const query = initiativeSearch.value.trim().toLowerCase()
-  return initiativesList.value.filter((item) => {
-    if (!selectedStatuses.value.includes(item.status)) {
-      return false
-    }
-    if (query) {
-      const matchTitle = item.title.toLowerCase().includes(query)
-      const matchDesc = item.description?.toLowerCase().includes(query)
-      if (!matchTitle && !matchDesc) {
-        return false
-      }
-    }
-    return true
-  })
-})
+const activeInitiatives = computed(() =>
+  filterActiveInitiatives(initiativesList.value, selectedStatuses.value, initiativeSearch.value)
+)
 
 const dashboardTabItems = computed(() => [
   {
@@ -425,7 +409,6 @@ watch(
                             InitiativePriorityBadge(
                               :priority="item.priority"
                               :initiative-id="item.id"
-                              :initiative-title="item.title"
                             )
 
                           //- Resp. Técnico Column (Technical Owner)

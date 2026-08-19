@@ -7,13 +7,9 @@ const props = withDefaults(
   defineProps<{
     priority: PriorityLevel
     initiativeId: string
-    initiativeTitle?: string
     editable?: boolean
   }>(),
-  {
-    initiativeTitle: 'la iniciativa',
-    editable: true
-  }
+  { editable: true }
 )
 
 const emit = defineEmits<{

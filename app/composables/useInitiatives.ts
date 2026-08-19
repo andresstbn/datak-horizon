@@ -20,6 +20,7 @@ export function useInitiatives() {
 
   const items = useState<InitiativeListItem[]>('initiatives:items', () => [])
   const users = useState<OwnerRef[]>('workspace:users', () => [])
+  const isUsersLoading = useState<boolean>('workspace:usersLoading', () => false)
   const isLoading = useState<boolean>('initiatives:loading', () => false)
   const errorMessage = useState<string | null>('initiatives:error', () => null)
   const filters = useState<InitiativeFilters>('initiatives:filters', createDefaultFilters)
@@ -44,14 +45,21 @@ export function useInitiatives() {
     }
   }
 
+  // Every owner dropdown asks for the list on mount, so guard it: one request
+  // per session instead of one per rendered row.
   async function fetchUsers(): Promise<void> {
+    if (users.value.length > 0 || isUsersLoading.value) return
+
     const token = await getIdToken()
     if (!token) return
 
+    isUsersLoading.value = true
     try {
       users.value = await userService.list(token)
     } catch (err) {
       console.error('Error loading users:', err)
+    } finally {
+      isUsersLoading.value = false
     }
   }
 

@@ -117,7 +117,7 @@ async function handleSelectOwner(userId: string | null) {
         span.truncate.text-foreground {{ owner.displayName ?? owner.email }}
       template(v-else)
         UIcon.size-3.text-muted(name="i-lucide-user")
-        span.text-dimmed {{ isTechnical ? 'Sin asignar' : 'Sin asignar' }}
+        span.text-dimmed Sin asignar
       UIcon.size-3.text-muted.shrink-0(name="i-lucide-chevron-down")
 
   .flex.items-center.gap-1.text-xs(v-else)
