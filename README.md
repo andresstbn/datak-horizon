@@ -84,20 +84,39 @@ reactiva en `app/composables/`, y los componentes solo renderizan (ver `RULES.md
 | `pnpm db:studio`   | Abre Drizzle Studio                                    |
 | `pnpm db:seed`     | Reinicia e inserta datos de ejemplo                    |
 
-## Autenticación
+## Autenticación y Control de Acceso (Allowlist)
 
-La autenticación se delega en **Firebase Authentication** con Google Sign-In.
+La autenticación se delega en **Firebase Authentication** con Google Sign-In, pero el acceso a la plataforma está protegido mediante una **allowlist explícita server-side**. Autenticarse correctamente con Google **no** otorga acceso por defecto a Horizon si la cuenta no figura en la lista autorizada.
 
-- El cliente inicia sesión (`app/plugins/firebase.client.ts` + `useAuth`) y obtiene
-  un **ID token**.
-- Las peticiones a la API envían `Authorization: Bearer <token>`.
-- El servidor verifica el token con el **Admin SDK**
-  (`server/utils/auth.ts` → `server/utils/firebaseAdmin.ts`).
-- La tabla `users` guarda **solo el perfil de aplicación**, vinculado al
-  `firebase_uid`; no almacena credenciales.
+### Flujo de autorización server-side
 
-Endpoint protegido de ejemplo: `GET /api/me` devuelve el perfil del usuario
-autenticado (creándolo en el primer inicio de sesión).
+1. El cliente inicia sesión en Google mediante Firebase (`app/plugins/firebase.client.ts` + `useAuth`) y obtiene un **ID token**.
+2. Las peticiones a la API envían el header `Authorization: Bearer <token>`.
+3. Todos los endpoints protegidos invocan `requireAuth(event)` (`server/utils/auth.ts`), el cual:
+   - Valida la firma y expiración del ID token con **Firebase Admin SDK**.
+   - Evalúa si el email del token pertenece a la **allowlist** de usuarios autorizados (`server/utils/allowlist.ts`).
+   - Si el email no está en la allowlist o no existe, responde de inmediato con **HTTP 403 Forbidden** antes de procesar la lógica de negocio o interactuar con la base de datos.
+4. Si el usuario está autorizado, `GET /api/me` obtiene o provisiona su perfil de aplicación en la tabla `users`.
+
+### Dónde vive la allowlist y cómo agregar un usuario
+
+La allowlist opera bajo dos mecanismos complementarios:
+
+1. **Lista base versionada en el repositorio:**
+   Ubicada en [`server/utils/allowlist.ts`](file:///Users/daniel/Datak/datak-services/datak-horizon/server/utils/allowlist.ts) (`DEFAULT_ALLOWED_EMAILS`). Contiene las cuentas de los miembros del equipo y semillas de desarrollo. Para autorizar un nuevo usuario de forma estándar:
+   - Añade el email al array `DEFAULT_ALLOWED_EMAILS` en `server/utils/allowlist.ts`.
+   - Realiza un commit en una rama y abre un PR.
+   - Tras la aprobación y merge a `main`, haz deploy a Cloud Run.
+
+2. **Variable de entorno en runtime (`NUXT_AUTH_ALLOWLIST`):**
+   Permite autorizar emails adicionales dinámicamente mediante una lista separada por comas (por ejemplo: `NUXT_AUTH_ALLOWLIST="usuario1@datak.co,usuario2@datak.co"`), configurable en las variables de Cloud Run o en el archivo `.env`.
+
+### Experiencia para usuarios no autorizados (UX)
+
+Si un usuario con cuenta de Google válida pero no autorizada intenta acceder:
+- Los endpoints de la API rechazan la petición con `403 Forbidden` y no exponen información interna.
+- La aplicación muestra una alerta clara indicando que la cuenta no está autorizada para Datak Horizon.
+- Se ofrece la opción de cerrar sesión de forma segura para cambiar de cuenta.
 
 ### Credenciales de Firebase
 

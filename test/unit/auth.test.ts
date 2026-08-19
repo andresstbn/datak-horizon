@@ -25,55 +25,121 @@ function makeEvent(headers: Record<string, string>): H3Event {
 describe('auth utility', () => {
   beforeEach(() => {
     verifyIdTokenMock.mockReset()
+    delete process.env.NUXT_AUTH_ALLOWLIST
   })
 
-  it('maps a decoded Firebase token to a VerifiedToken', async () => {
-    verifyIdTokenMock.mockResolvedValue({
-      uid: 'abc',
-      email: 'a@b.com',
-      name: 'Ana',
-      picture: 'http://pic',
-      email_verified: true
+  describe('verifyIdToken', () => {
+    it('maps a decoded Firebase token to a VerifiedToken', async () => {
+      verifyIdTokenMock.mockResolvedValue({
+        uid: 'abc',
+        email: 'daniel@datak.co',
+        name: 'Daniel',
+        picture: 'http://pic',
+        email_verified: true
+      })
+
+      const result = await verifyIdToken('valid-token')
+
+      expect(result).toEqual({
+        uid: 'abc',
+        email: 'daniel@datak.co',
+        name: 'Daniel',
+        picture: 'http://pic',
+        emailVerified: true
+      })
     })
 
-    const result = await verifyIdToken('valid-token')
-
-    expect(result).toEqual({
-      uid: 'abc',
-      email: 'a@b.com',
-      name: 'Ana',
-      picture: 'http://pic',
-      emailVerified: true
+    it('throws 401 when the token is empty', async () => {
+      await expect(verifyIdToken('')).rejects.toMatchObject({ statusCode: 401 })
     })
-  })
 
-  it('throws 401 when the token is empty', async () => {
-    await expect(verifyIdToken('')).rejects.toMatchObject({ statusCode: 401 })
-  })
-
-  it('throws 401 when the Admin SDK rejects the token', async () => {
-    verifyIdTokenMock.mockRejectedValue(new Error('expired'))
-    await expect(verifyIdToken('bad')).rejects.toMatchObject({ statusCode: 401 })
-  })
-
-  it('rejects requests without an Authorization header', async () => {
-    await expect(requireAuth(makeEvent({}))).rejects.toMatchObject({
-      statusCode: 401
+    it('throws 401 when the Admin SDK rejects the token', async () => {
+      verifyIdTokenMock.mockRejectedValue(new Error('expired'))
+      await expect(verifyIdToken('bad')).rejects.toMatchObject({ statusCode: 401 })
     })
   })
 
-  it('rejects a malformed Authorization header', async () => {
-    await expect(
-      requireAuth(makeEvent({ authorization: 'Token xyz' }))
-    ).rejects.toMatchObject({ statusCode: 401 })
-  })
+  describe('requireAuth', () => {
+    it('rejects requests without an Authorization header with 401', async () => {
+      await expect(requireAuth(makeEvent({}))).rejects.toMatchObject({
+        statusCode: 401
+      })
+    })
 
-  it('accepts a valid Bearer token', async () => {
-    verifyIdTokenMock.mockResolvedValue({ uid: 'abc', email: 'a@b.com' })
+    it('rejects a malformed Authorization header with 401', async () => {
+      await expect(
+        requireAuth(makeEvent({ authorization: 'Token xyz' }))
+      ).rejects.toMatchObject({ statusCode: 401 })
+    })
 
-    const result = await requireAuth(makeEvent({ authorization: 'Bearer good' }))
+    it('rejects with 403 when user is authenticated with Google but NOT in allowlist', async () => {
+      verifyIdTokenMock.mockResolvedValue({
+        uid: 'unauthorized-uid',
+        email: 'random.person@gmail.com',
+        name: 'Random User'
+      })
 
-    expect(result.uid).toBe('abc')
-    expect(verifyIdTokenMock).toHaveBeenCalledWith('good')
+      await expect(
+        requireAuth(makeEvent({ authorization: 'Bearer valid-unauthorized-token' }))
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        statusMessage: expect.stringContaining('not authorized in Horizon allowlist')
+      })
+    })
+
+    it('rejects with 403 when decoded token has no email', async () => {
+      verifyIdTokenMock.mockResolvedValue({
+        uid: 'no-email-uid',
+        email: undefined
+      })
+
+      await expect(
+        requireAuth(makeEvent({ authorization: 'Bearer token-without-email' }))
+      ).rejects.toMatchObject({
+        statusCode: 403
+      })
+    })
+
+    it('accepts an authorized user in the default allowlist', async () => {
+      verifyIdTokenMock.mockResolvedValue({
+        uid: 'user-daniel',
+        email: 'daniel@datak.co',
+        name: 'Daniel Esteban'
+      })
+
+      const result = await requireAuth(makeEvent({ authorization: 'Bearer good-token' }))
+
+      expect(result.uid).toBe('user-daniel')
+      expect(result.email).toBe('daniel@datak.co')
+      expect(verifyIdTokenMock).toHaveBeenCalledWith('good-token')
+    })
+
+    it('accepts an authorized user with case-insensitive email', async () => {
+      verifyIdTokenMock.mockResolvedValue({
+        uid: 'user-tania',
+        email: 'TANIA@DATAK.CO',
+        name: 'Tania'
+      })
+
+      const result = await requireAuth(makeEvent({ authorization: 'Bearer good-token' }))
+
+      expect(result.uid).toBe('user-tania')
+      expect(result.email).toBe('TANIA@DATAK.CO')
+    })
+
+    it('accepts an authorized user configured via NUXT_AUTH_ALLOWLIST env', async () => {
+      process.env.NUXT_AUTH_ALLOWLIST = 'newcolleague@datak.co, external@partner.com'
+
+      verifyIdTokenMock.mockResolvedValue({
+        uid: 'user-new',
+        email: 'newcolleague@datak.co',
+        name: 'New Colleague'
+      })
+
+      const result = await requireAuth(makeEvent({ authorization: 'Bearer good-token' }))
+
+      expect(result.uid).toBe('user-new')
+      expect(result.email).toBe('newcolleague@datak.co')
+    })
   })
 })

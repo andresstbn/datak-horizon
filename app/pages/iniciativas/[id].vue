@@ -8,7 +8,7 @@ const route = useRoute()
 const router = useRouter()
 const id = route.params.id as string
 
-const { isReady, isAuthenticated, getIdToken } = useAuth()
+const { isReady, isAuthenticated, isAuthorized, isAccessDenied, deniedEmail, getIdToken, logout } = useAuth()
 const { initiative, isLoading, errorMessage, fetchInitiative } = useInitiative(id)
 const toast = useToast()
 
@@ -70,9 +70,9 @@ async function handleCopyContext() {
 }
 
 watch(
-  () => isAuthenticated.value,
-  (authed) => {
-    if (authed) {
+  () => isAuthorized.value,
+  (authorized) => {
+    if (authorized) {
       fetchInitiative()
     }
   },
@@ -95,7 +95,24 @@ watch(
     description="Entra con tu cuenta de Google para ver la iniciativa."
   )
 
-  template(v-else)
+  .space-y-4(v-else-if="isAccessDenied")
+    UAlert(
+      color="error"
+      variant="subtle"
+      icon="i-lucide-shield-alert"
+      title="Acceso restringido"
+      :description="`Tu cuenta de Google (${deniedEmail ?? 'autenticada'}) no está autorizada para acceder a Datak Horizon. Si necesitas acceso, solicita autorización al equipo de administración.`"
+    )
+    .flex.justify-start
+      UButton(
+        icon="i-lucide-log-out"
+        label="Cerrar sesión"
+        color="neutral"
+        variant="outline"
+        @click="logout"
+      )
+
+  template(v-else-if="isAuthorized")
     UAlert(
       v-if="errorMessage"
       color="error"

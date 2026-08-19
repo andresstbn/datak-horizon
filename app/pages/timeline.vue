@@ -4,7 +4,7 @@ import { formatInitiativeDate, statusBadge, healthBadge } from '~~/shared/utils/
 
 definePageMeta({ pageTitle: 'Línea de Tiempo' })
 
-const { isReady, isAuthenticated } = useAuth()
+const { isReady, isAuthenticated, isAuthorized, isAccessDenied, deniedEmail, logout } = useAuth()
 const { items: initiatives, isLoading, errorMessage, fetchInitiatives } = useInitiatives()
 
 interface Week {
@@ -163,9 +163,9 @@ function getHealthColorClass(health: string): string {
 }
 
 watch(
-  () => isAuthenticated.value,
-  (authed) => {
-    if (authed) {
+  () => isAuthorized.value,
+  (authorized) => {
+    if (authorized) {
       fetchInitiatives()
     }
   },
@@ -188,7 +188,24 @@ watch(
     description="Entra con tu cuenta de Google para acceder a Datak Horizon."
   )
 
-  template(v-else)
+  .space-y-4(v-else-if="isAccessDenied")
+    UAlert(
+      color="error"
+      variant="subtle"
+      icon="i-lucide-shield-alert"
+      title="Acceso restringido"
+      :description="`Tu cuenta de Google (${deniedEmail ?? 'autenticada'}) no está autorizada para acceder a Datak Horizon. Si necesitas acceso, solicita autorización al equipo de administración.`"
+    )
+    .flex.justify-start
+      UButton(
+        icon="i-lucide-log-out"
+        label="Cerrar sesión"
+        color="neutral"
+        variant="outline"
+        @click="logout"
+      )
+
+  template(v-else-if="isAuthorized")
     //- Top Navigation Header
     .flex.flex-wrap.items-center.justify-between.gap-4.pb-4.border-b.border-default
       .space-y-1

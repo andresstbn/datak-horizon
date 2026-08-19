@@ -9,6 +9,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
+    authAllowlist: '',
     slackWebhookUrl: '',
     siteUrl: 'http://localhost:3000',
     confluenceDomain: '',

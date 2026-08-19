@@ -1,5 +1,6 @@
 import { createError, getHeader, type H3Event } from 'h3'
 import { getAdminAuth } from './firebaseAdmin'
+import { isEmailAllowed } from './allowlist'
 
 /** Normalised shape of a verified Firebase ID token. */
 export interface VerifiedToken {
@@ -8,6 +9,18 @@ export interface VerifiedToken {
   name?: string
   picture?: string
   emailVerified?: boolean
+}
+
+/**
+ * Helper to safely resolve runtime auth allowlist if present in Nitro config or env.
+ */
+export function getRuntimeAuthAllowlist(event?: H3Event): string | undefined {
+  try {
+    const config = event ? useRuntimeConfig(event) : useRuntimeConfig()
+    return (config?.authAllowlist as string) || process.env.NUXT_AUTH_ALLOWLIST
+  } catch {
+    return process.env.NUXT_AUTH_ALLOWLIST
+  }
 }
 
 /**
@@ -34,7 +47,11 @@ export async function verifyIdToken(idToken: string): Promise<VerifiedToken> {
   }
 }
 
-/** Extract a Bearer token from the request and verify it. */
+/**
+ * Extract a Bearer token from the request, verify it with Firebase Admin SDK,
+ * and ensure that the user's email is present in the authorized allowlist.
+ * Throws 401 for unauthenticated/invalid tokens and 403 for unauthorized users.
+ */
 export async function requireAuth(event: H3Event): Promise<VerifiedToken> {
   const header = getHeader(event, 'authorization') ?? ''
   const [scheme, token] = header.split(' ')
@@ -46,5 +63,15 @@ export async function requireAuth(event: H3Event): Promise<VerifiedToken> {
     })
   }
 
-  return verifyIdToken(token)
+  const verified = await verifyIdToken(token)
+
+  const customAllowlist = getRuntimeAuthAllowlist(event)
+  if (!verified.email || !isEmailAllowed(verified.email, customAllowlist)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Forbidden: user email is not authorized in Horizon allowlist'
+    })
+  }
+
+  return verified
 }
