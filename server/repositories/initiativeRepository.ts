@@ -39,6 +39,19 @@ export const initiativeRepository = {
     })
   },
 
+  /** Fetch only id and title for public preview. */
+  async findTitleById(id: string) {
+    const db = getDb()
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    return db.query.initiatives.findFirst({
+      where: isUuid ? eq(initiatives.id, id) : eq(initiatives.slug, id),
+      columns: {
+        id: true,
+        title: true
+      }
+    })
+  },
+
   /** Create a new initiative. */
   async create(data: NewInitiative): Promise<Initiative> {
     const db = getDb()

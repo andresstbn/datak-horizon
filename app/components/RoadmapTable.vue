@@ -14,6 +14,27 @@ defineProps<{
   loading: boolean
 }>()
 
+const toast = useToast()
+
+async function handleCopyLink(id: string) {
+  try {
+    const url = `${window.location.origin}/iniciativas/${id}`
+    await navigator.clipboard.writeText(url)
+    toast.add({
+      title: 'Enlace copiado',
+      description: 'El enlace de la iniciativa se copió al portapapeles.',
+      icon: 'i-lucide-check'
+    })
+  } catch {
+    toast.add({
+      title: 'Error',
+      description: 'No se pudo copiar el enlace al portapapeles.',
+      color: 'error',
+      icon: 'i-lucide-triangle-alert'
+    })
+  }
+}
+
 const columns: TableColumn<InitiativeListItem>[] = [
   { accessorKey: 'title', header: 'Título' },
   { accessorKey: 'status', header: 'Estado' },
@@ -24,7 +45,8 @@ const columns: TableColumn<InitiativeListItem>[] = [
   { accessorKey: 'technicalOwner', header: 'Resp. técnico' },
   { accessorKey: 'committedDate', header: 'Comprometida' },
   { accessorKey: 'estimatedDate', header: 'Estimada' },
-  { accessorKey: 'delayReason', header: 'Retraso' }
+  { accessorKey: 'delayReason', header: 'Retraso' },
+  { id: 'actions', header: '' }
 ]
 </script>
 
@@ -95,4 +117,23 @@ UTable(
   template(#delayReason-cell="{ row }")
     span.text-muted.truncate.max-w-xs(v-if="row.original.delayReason" :title="row.original.delayReason") {{ row.original.delayReason }}
     span.text-dimmed(v-else) —
+
+  template(#actions-cell="{ row }")
+    .flex.items-center.justify-end.gap-1
+      UButton(
+        icon="i-lucide-link"
+        color="neutral"
+        variant="ghost"
+        size="xs"
+        aria-label="Copiar enlace"
+        @click="handleCopyLink(row.original.id)"
+      )
+      UButton(
+        icon="i-lucide-chevron-right"
+        color="neutral"
+        variant="ghost"
+        size="xs"
+        :to="`/iniciativas/${row.original.id}`"
+        aria-label="Ver iniciativa"
+      )
 </template>
