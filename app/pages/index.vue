@@ -71,8 +71,8 @@ const selectedStatuses = useState<InitiativeStatus[]>(
   () => [...DEFAULT_ACTIVE_STATUSES]
 )
 
-const selectedTechnicalOwner = useState<string>('dashboard:selectedTechnicalOwner', () => 'all')
-const selectedPriority = useState<PriorityLevel | 'all'>('dashboard:selectedPriority', () => 'all')
+const selectedTechnicalOwners = useState<string[]>('dashboard:selectedTechnicalOwners', () => [])
+const selectedPriorities = useState<PriorityLevel[]>('dashboard:selectedPriorities', () => [])
 
 const isReadyShown = computed({
   get: () => selectedStatuses.value.includes('ready'),
@@ -105,6 +105,22 @@ function toggleStatus(status: InitiativeStatus) {
   }
 }
 
+function togglePriority(priority: PriorityLevel) {
+  if (selectedPriorities.value.includes(priority)) {
+    selectedPriorities.value = selectedPriorities.value.filter(p => p !== priority)
+  } else {
+    selectedPriorities.value = [...selectedPriorities.value, priority]
+  }
+}
+
+function toggleTechnicalOwner(ownerId: string) {
+  if (selectedTechnicalOwners.value.includes(ownerId)) {
+    selectedTechnicalOwners.value = selectedTechnicalOwners.value.filter(id => id !== ownerId)
+  } else {
+    selectedTechnicalOwners.value = [...selectedTechnicalOwners.value, ownerId]
+  }
+}
+
 const statusCounts = computed(() => {
   const counts: Record<InitiativeStatus, number> = {
     discovery: 0,
@@ -124,18 +140,14 @@ const statusCounts = computed(() => {
   return counts
 })
 
-const isStatusFiltered = computed(() => {
-  if (selectedStatuses.value.length !== DEFAULT_ACTIVE_STATUSES.length) return true
-  return !DEFAULT_ACTIVE_STATUSES.every(s => selectedStatuses.value.includes(s))
-})
-
-const hasActiveFilters = computed(() => {
-  return (
-    initiativeSearch.value.trim() !== ''
-    || isStatusFiltered.value
-    || selectedTechnicalOwner.value !== 'all'
-    || selectedPriority.value !== 'all'
-  )
+const priorityCounts = computed(() => {
+  const counts: Record<PriorityLevel, number> = { high: 0, medium: 0, low: 0 }
+  for (const item of initiativesList.value) {
+    if (item.priority in counts) {
+      counts[item.priority]++
+    }
+  }
+  return counts
 })
 
 const technicalOwnersList = computed(() => {
@@ -159,33 +171,57 @@ const technicalOwnersList = computed(() => {
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
 })
 
-const selectedTechnicalOwnerLabel = computed(() => {
-  if (selectedTechnicalOwner.value === 'all') return 'Todos'
-  if (selectedTechnicalOwner.value === 'unassigned') return 'Sin asignar'
-  const found = technicalOwnersList.value.find(u => u.id === selectedTechnicalOwner.value)
-  return found ? found.name : selectedTechnicalOwner.value
+const technicalOwnerCounts = computed(() => {
+  const counts: Record<string, number> = { unassigned: 0 }
+  for (const item of initiativesList.value) {
+    if (item.technicalOwner) {
+      counts[item.technicalOwner.id] = (counts[item.technicalOwner.id] || 0) + 1
+    } else {
+      counts.unassigned++
+    }
+  }
+  return counts
 })
 
-const selectedPriorityLabel = computed(() => {
-  if (selectedPriority.value === 'all') return 'Todas'
-  return priorityBadge(selectedPriority.value).label
+function getOwnerName(ownerId: string): string {
+  if (ownerId === 'unassigned') return 'Sin asignar'
+  const found = technicalOwnersList.value.find(u => u.id === ownerId)
+  return found ? found.name : ownerId
+}
+
+function selectAllTechnicalOwners() {
+  selectedTechnicalOwners.value = ['unassigned', ...technicalOwnersList.value.map(o => o.id)]
+}
+
+const isStatusFiltered = computed(() => {
+  if (selectedStatuses.value.length !== DEFAULT_ACTIVE_STATUSES.length) return true
+  return !DEFAULT_ACTIVE_STATUSES.every(s => selectedStatuses.value.includes(s))
+})
+
+const hasActiveFilters = computed(() => {
+  return (
+    initiativeSearch.value.trim() !== ''
+    || isStatusFiltered.value
+    || selectedTechnicalOwners.value.length > 0
+    || selectedPriorities.value.length > 0
+  )
 })
 
 function resetAllFilters() {
   initiativeSearch.value = ''
   selectedStatuses.value = [...DEFAULT_ACTIVE_STATUSES]
-  selectedTechnicalOwner.value = 'all'
-  selectedPriority.value = 'all'
+  selectedTechnicalOwners.value = []
+  selectedPriorities.value = []
 }
 
-// Filtered active initiatives based on selected statuses, search term, technical owner, and priority
+// Filtered active initiatives based on selected statuses, search term, technical owners, and priorities
 const activeInitiatives = computed(() =>
   filterActiveInitiatives(
     initiativesList.value,
     selectedStatuses.value,
     initiativeSearch.value,
-    selectedTechnicalOwner.value,
-    selectedPriority.value
+    selectedTechnicalOwners.value,
+    selectedPriorities.value
   )
 )
 
@@ -410,28 +446,30 @@ watch(
               .flex.flex-wrap.items-center.pt-1.border-t.border-default(v-if="hasActiveFilters" class="gap-1.5")
                 span.text-xs.text-muted.font-medium Filtros activos:
 
-                //- Priority Chip
+                //- Priority Chips
                 UBadge(
-                  v-if="selectedPriority !== 'all'"
+                  v-for="p in selectedPriorities"
+                  :key="`prio-${p}`"
                   size="xs"
                   color="primary"
                   variant="subtle"
                   class="gap-1 cursor-pointer"
-                  @click="selectedPriority = 'all'"
+                  @click="togglePriority(p)"
                 )
-                  span Prioridad: {{ selectedPriorityLabel }}
+                  span Prioridad: {{ priorityBadge(p).label }}
                   UIcon.size-3(name="i-lucide-x")
 
-                //- Technical Owner Chip
+                //- Technical Owner Chips
                 UBadge(
-                  v-if="selectedTechnicalOwner !== 'all'"
+                  v-for="ownerId in selectedTechnicalOwners"
+                  :key="`owner-${ownerId}`"
                   size="xs"
                   color="primary"
                   variant="subtle"
                   class="gap-1 cursor-pointer"
-                  @click="selectedTechnicalOwner = 'all'"
+                  @click="toggleTechnicalOwner(ownerId)"
                 )
-                  span Resp: {{ selectedTechnicalOwnerLabel }}
+                  span Resp: {{ getOwnerName(ownerId) }}
                   UIcon.size-3(name="i-lucide-x")
 
                 //- Status Chip (if modified from default active)
@@ -500,34 +538,38 @@ watch(
                         button.flex.items-center.gap-1.transition.rounded(
                           type="button"
                           class="px-1.5 py-0.5"
-                          :class="selectedPriority !== 'all' ? 'text-primary font-bold bg-primary/10' : 'text-muted hover:text-foreground hover:bg-elevated/60'"
+                          :class="selectedPriorities.length > 0 ? 'text-primary font-bold bg-primary/10' : 'text-muted hover:text-foreground hover:bg-elevated/60'"
                         )
                           span Prioridad
+                          UBadge(
+                            v-if="selectedPriorities.length > 0"
+                            :label="String(selectedPriorities.length)"
+                            size="xs"
+                            color="primary"
+                            variant="subtle"
+                          )
                           UIcon.size-3(
-                            :name="selectedPriority !== 'all' ? 'i-lucide-filter' : 'i-lucide-chevron-down'"
-                            :class="selectedPriority !== 'all' ? 'text-primary' : 'text-dimmed'"
+                            :name="selectedPriorities.length > 0 ? 'i-lucide-filter' : 'i-lucide-chevron-down'"
+                            :class="selectedPriorities.length > 0 ? 'text-primary' : 'text-dimmed'"
                           )
                         template(#content)
-                          .p-2.space-y-1.w-48
-                            .text-xs.font-semibold.px-2.py-1.border-b.border-default.text-muted Filtrar por prioridad
-                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
-                              type="button"
-                              class="px-2 py-1.5 hover:bg-elevated"
-                              :class="{ 'font-semibold text-primary': selectedPriority === 'all' }"
-                              @click="selectedPriority = 'all'"
-                            )
-                              span Todas
-                              UIcon(v-if="selectedPriority === 'all'" name="i-lucide-check" class="size-3.5 text-primary")
-                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
-                              v-for="p in ALL_PRIORITY_OPTIONS"
-                              :key="p.value"
-                              type="button"
-                              class="px-2 py-1.5 hover:bg-elevated"
-                              :class="{ 'font-semibold text-primary': selectedPriority === p.value }"
-                              @click="selectedPriority = p.value"
-                            )
-                              UBadge(:color="p.badge.color" :label="p.badge.label" size="xs" variant="subtle")
-                              UIcon(v-if="selectedPriority === p.value" name="i-lucide-check" class="size-3.5 text-primary")
+                          .p-3.space-y-3.w-56
+                            .flex.items-center.justify-between.border-b.border-default.pb-2
+                              span.text-xs.font-semibold Filtrar prioridad
+                              .flex.items-center.gap-1
+                                UButton(v-if="selectedPriorities.length > 0" label="Limpiar" size="xs" variant="ghost" color="neutral" @click="selectedPriorities = []")
+                                UButton(v-else label="Todas" size="xs" variant="ghost" color="neutral" @click="selectedPriorities = ALL_PRIORITY_OPTIONS.map(p => p.value)")
+
+                            .space-y-2
+                              .flex.items-center.justify-between(v-for="p in ALL_PRIORITY_OPTIONS" :key="p.value")
+                                UCheckbox(
+                                  :model-value="selectedPriorities.includes(p.value)"
+                                  size="sm"
+                                  @update:model-value="togglePriority(p.value)"
+                                )
+                                  template(#label)
+                                    UBadge(:color="p.badge.color" :label="p.badge.label" size="xs" variant="subtle")
+                                span.text-xs.text-muted {{ priorityCounts[p.value] || 0 }}
 
                     //- Resp. Técnico Column Header Filter
                     .flex.justify-start
@@ -535,51 +577,60 @@ watch(
                         button.flex.items-center.gap-1.transition.rounded(
                           type="button"
                           class="px-1.5 py-0.5"
-                          :class="selectedTechnicalOwner !== 'all' ? 'text-primary font-bold bg-primary/10' : 'text-muted hover:text-foreground hover:bg-elevated/60'"
+                          :class="selectedTechnicalOwners.length > 0 ? 'text-primary font-bold bg-primary/10' : 'text-muted hover:text-foreground hover:bg-elevated/60'"
                         )
                           span Resp. Técnico
+                          UBadge(
+                            v-if="selectedTechnicalOwners.length > 0"
+                            :label="String(selectedTechnicalOwners.length)"
+                            size="xs"
+                            color="primary"
+                            variant="subtle"
+                          )
                           UIcon.size-3(
-                            :name="selectedTechnicalOwner !== 'all' ? 'i-lucide-filter' : 'i-lucide-chevron-down'"
-                            :class="selectedTechnicalOwner !== 'all' ? 'text-primary' : 'text-dimmed'"
+                            :name="selectedTechnicalOwners.length > 0 ? 'i-lucide-filter' : 'i-lucide-chevron-down'"
+                            :class="selectedTechnicalOwners.length > 0 ? 'text-primary' : 'text-dimmed'"
                           )
                         template(#content)
-                          .p-2.space-y-1.w-64.max-h-72.overflow-y-auto
-                            .text-xs.font-semibold.px-2.py-1.border-b.border-default.text-muted Filtrar resp. técnico
-                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
-                              type="button"
-                              class="px-2 py-1.5 hover:bg-elevated"
-                              :class="{ 'font-semibold text-primary': selectedTechnicalOwner === 'all' }"
-                              @click="selectedTechnicalOwner = 'all'"
-                            )
-                              span Todos los responsables
-                              UIcon(v-if="selectedTechnicalOwner === 'all'" name="i-lucide-check" class="size-3.5 text-primary")
-                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
-                              type="button"
-                              class="px-2 py-1.5 hover:bg-elevated"
-                              :class="{ 'font-semibold text-primary': selectedTechnicalOwner === 'unassigned' }"
-                              @click="selectedTechnicalOwner = 'unassigned'"
-                            )
-                              .flex.items-center.gap-2
-                                UIcon.text-muted(name="i-lucide-user-x" class="size-3.5")
-                                span Sin asignar
-                              UIcon(v-if="selectedTechnicalOwner === 'unassigned'" name="i-lucide-check" class="size-3.5 text-primary")
-                            .border-t.border-default.my-1(v-if="technicalOwnersList.length > 0")
-                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
-                              v-for="owner in technicalOwnersList"
-                              :key="owner.id"
-                              type="button"
-                              class="px-2 py-1.5 hover:bg-elevated"
-                              :class="{ 'font-semibold text-primary': selectedTechnicalOwner === owner.id }"
-                              @click="selectedTechnicalOwner = owner.id"
-                            )
-                              .flex.items-center.gap-2.min-w-0.truncate
-                                UAvatar(
-                                  :src="owner.photoUrl ?? undefined"
-                                  :alt="owner.name"
-                                  size="2xs"
+                          .p-3.space-y-3.w-72.max-h-80.overflow-y-auto
+                            .flex.items-center.justify-between.border-b.border-default.pb-2
+                              span.text-xs.font-semibold Filtrar resp. técnico
+                              .flex.items-center.gap-1
+                                UButton(v-if="selectedTechnicalOwners.length > 0" label="Limpiar" size="xs" variant="ghost" color="neutral" @click="selectedTechnicalOwners = []")
+                                UButton(v-else label="Todos" size="xs" variant="ghost" color="neutral" @click="selectAllTechnicalOwners")
+
+                            .space-y-2
+                              //- Sin asignar
+                              .flex.items-center.justify-between
+                                UCheckbox(
+                                  :model-value="selectedTechnicalOwners.includes('unassigned')"
+                                  size="sm"
+                                  @update:model-value="toggleTechnicalOwner('unassigned')"
                                 )
-                                span.truncate {{ owner.name }}
-                              UIcon(v-if="selectedTechnicalOwner === owner.id" name="i-lucide-check" class="size-3.5 shrink-0 text-primary")
+                                  template(#label)
+                                    .flex.items-center(class="gap-1.5")
+                                      UIcon.text-muted(name="i-lucide-user-x" class="size-3.5")
+                                      span.text-xs Sin asignar
+                                span.text-xs.text-muted {{ technicalOwnerCounts.unassigned || 0 }}
+
+                              .border-t.border-default.my-1(v-if="technicalOwnersList.length > 0")
+
+                              //- Users
+                              .flex.items-center.justify-between(v-for="owner in technicalOwnersList" :key="owner.id")
+                                UCheckbox(
+                                  :model-value="selectedTechnicalOwners.includes(owner.id)"
+                                  size="sm"
+                                  @update:model-value="toggleTechnicalOwner(owner.id)"
+                                )
+                                  template(#label)
+                                    .flex.items-center.min-w-0(class="gap-1.5")
+                                      UAvatar(
+                                        :src="owner.photoUrl ?? undefined"
+                                        :alt="owner.name"
+                                        size="2xs"
+                                      )
+                                      span.text-xs.truncate(class="max-w-[140px]") {{ owner.name }}
+                                span.text-xs.text-muted {{ technicalOwnerCounts[owner.id] || 0 }}
 
                     //- Estado Column Header Filter
                     .flex.justify-center

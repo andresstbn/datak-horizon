@@ -129,5 +129,12 @@ describe('initiative helpers', () => {
     expect(filterActiveInitiatives(items, active, '', 'u1', 'high').map(i => i.id)).toEqual(['1'])
     // Combined filter with no match
     expect(filterActiveInitiatives(items, active, '', 'u2', 'high').map(i => i.id)).toEqual([])
+
+    // Multi-select priorities: high + medium
+    expect(filterActiveInitiatives(items, active, '', 'all', ['high', 'medium']).map(i => i.id)).toEqual(['1', '3', '4'])
+    // Multi-select owners: u2 + unassigned
+    expect(filterActiveInitiatives(items, active, '', ['u2', 'unassigned'], 'all').map(i => i.id)).toEqual(['2', '3'])
+    // Multi-select both: [u1, u2] + [high, low]
+    expect(filterActiveInitiatives(items, active, '', ['u1', 'u2'], ['high', 'low']).map(i => i.id)).toEqual(['1', '2'])
   })
 })
