@@ -109,4 +109,25 @@ describe('initiative helpers', () => {
     expect(filterActiveInitiatives(items, active, 'CARTERA').map(i => i.id)).toEqual(['c'])
     expect(filterActiveInitiatives(items, active, 'beta')).toEqual([])
   })
+
+  it('filters the dashboard list by technical owner and priority', () => {
+    const items = [
+      makeItem({ id: '1', status: 'in_development', priority: 'high', technicalOwner: { id: 'u1', displayName: 'Ana', email: 'a@x', photoUrl: null } }),
+      makeItem({ id: '2', status: 'in_development', priority: 'low', technicalOwner: { id: 'u2', displayName: 'Luis', email: 'l@x', photoUrl: null } }),
+      makeItem({ id: '3', status: 'in_development', priority: 'high', technicalOwner: null }),
+      makeItem({ id: '4', status: 'discovery', priority: 'medium', technicalOwner: { id: 'u1', displayName: 'Ana', email: 'a@x', photoUrl: null } })
+    ]
+    const active: InitiativeStatus[] = ['in_development', 'discovery']
+
+    // Filter by technical owner ID
+    expect(filterActiveInitiatives(items, active, '', 'u1', 'all').map(i => i.id)).toEqual(['1', '4'])
+    // Filter by unassigned technical owner
+    expect(filterActiveInitiatives(items, active, '', 'unassigned', 'all').map(i => i.id)).toEqual(['3'])
+    // Filter by priority
+    expect(filterActiveInitiatives(items, active, '', 'all', 'high').map(i => i.id)).toEqual(['1', '3'])
+    // Combined filter: u1 + high priority
+    expect(filterActiveInitiatives(items, active, '', 'u1', 'high').map(i => i.id)).toEqual(['1'])
+    // Combined filter with no match
+    expect(filterActiveInitiatives(items, active, '', 'u2', 'high').map(i => i.id)).toEqual([])
+  })
 })

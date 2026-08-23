@@ -171,19 +171,33 @@ export function paginate<T>(items: T[], page: number, perPage: number): Paginate
 }
 
 /**
- * Dashboard list filter: keep the initiatives whose status is selected and
- * whose title or description matches the free-text search. Pure.
+ * Dashboard list filter: keep the initiatives matching the selected statuses,
+ * free-text search, technical owner, and priority. Pure.
  */
 export function filterActiveInitiatives(
   items: InitiativeListItem[],
   statuses: InitiativeStatus[],
-  search: string
+  search: string,
+  technicalOwnerId: string = 'all',
+  priority: PriorityLevel | 'all' = 'all'
 ): InitiativeListItem[] {
   const query = search.trim().toLowerCase()
 
   return items.filter((item) => {
     if (!statuses.includes(item.status)) {
       return false
+    }
+    if (priority !== 'all' && item.priority !== priority) {
+      return false
+    }
+    if (technicalOwnerId !== 'all') {
+      if (technicalOwnerId === 'unassigned') {
+        if (item.technicalOwner !== null) {
+          return false
+        }
+      } else if (item.technicalOwner?.id !== technicalOwnerId) {
+        return false
+      }
     }
     if (!query) {
       return true

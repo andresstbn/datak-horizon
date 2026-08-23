@@ -1,16 +1,170 @@
 <script setup lang="ts">
 import { useInitiatives } from '~/composables/useInitiatives'
-import { formatInitiativeDate, statusBadge, healthBadge } from '~~/shared/utils/initiatives'
+import type { InitiativeStatus, PriorityLevel } from '~~/shared/types/initiative'
+import {
+  formatInitiativeDate,
+  statusBadge,
+  healthBadge,
+  priorityBadge,
+  filterActiveInitiatives
+} from '~~/shared/utils/initiatives'
 
 definePageMeta({ pageTitle: 'Línea de Tiempo' })
 
 const { isReady, isAuthenticated, isAuthorized, isAccessDenied, deniedEmail, logout } = useAuth()
-const { items: initiatives, isLoading, errorMessage, fetchInitiatives } = useInitiatives()
+const { items: initiatives, users, isLoading, errorMessage, fetchInitiatives, fetchUsers } = useInitiatives()
 
 interface Week {
   monday: Date
   label: string
 }
+
+const ALL_STATUS_OPTIONS: { label: string, value: InitiativeStatus }[] = [
+  { label: 'Descubrimiento', value: 'discovery' },
+  { label: 'Refinamiento', value: 'refinement' },
+  { label: 'Listo', value: 'ready' },
+  { label: 'En desarrollo', value: 'in_development' },
+  { label: 'QA', value: 'qa' },
+  { label: 'Bloqueado', value: 'blocked' },
+  { label: 'Desplegado', value: 'released' },
+  { label: 'Cancelado', value: 'cancelled' }
+]
+
+const ALL_PRIORITY_OPTIONS: { label: string, value: PriorityLevel, badge: ReturnType<typeof priorityBadge> }[] = [
+  { label: 'Alta', value: 'high', badge: priorityBadge('high') },
+  { label: 'Media', value: 'medium', badge: priorityBadge('medium') },
+  { label: 'Baja', value: 'low', badge: priorityBadge('low') }
+]
+
+const DEFAULT_ACTIVE_STATUSES: InitiativeStatus[] = [
+  'discovery',
+  'refinement',
+  'in_development',
+  'qa',
+  'blocked'
+]
+
+const initiativeSearch = ref('')
+const selectedStatuses = useState<InitiativeStatus[]>(
+  'timeline:selectedStatuses',
+  () => [...DEFAULT_ACTIVE_STATUSES]
+)
+const selectedTechnicalOwner = useState<string>('timeline:selectedTechnicalOwner', () => 'all')
+const selectedPriority = useState<PriorityLevel | 'all'>('timeline:selectedPriority', () => 'all')
+
+const isReadyShown = computed({
+  get: () => selectedStatuses.value.includes('ready'),
+  set: (show: boolean) => {
+    if (show && !selectedStatuses.value.includes('ready')) {
+      selectedStatuses.value = [...selectedStatuses.value, 'ready']
+    } else if (!show && selectedStatuses.value.includes('ready')) {
+      selectedStatuses.value = selectedStatuses.value.filter(s => s !== 'ready')
+    }
+  }
+})
+
+function toggleReadyStatus() {
+  isReadyShown.value = !isReadyShown.value
+}
+
+function selectAllStatuses() {
+  selectedStatuses.value = ALL_STATUS_OPTIONS.map(opt => opt.value)
+}
+
+function selectDefaultActive() {
+  selectedStatuses.value = [...DEFAULT_ACTIVE_STATUSES]
+}
+
+function toggleStatus(status: InitiativeStatus) {
+  if (selectedStatuses.value.includes(status)) {
+    selectedStatuses.value = selectedStatuses.value.filter(s => s !== status)
+  } else {
+    selectedStatuses.value = [...selectedStatuses.value, status]
+  }
+}
+
+const statusCounts = computed(() => {
+  const counts: Record<InitiativeStatus, number> = {
+    discovery: 0,
+    refinement: 0,
+    ready: 0,
+    in_development: 0,
+    qa: 0,
+    released: 0,
+    blocked: 0,
+    cancelled: 0
+  }
+  for (const item of initiatives.value) {
+    if (item.status in counts) {
+      counts[item.status]++
+    }
+  }
+  return counts
+})
+
+const isStatusFiltered = computed(() => {
+  if (selectedStatuses.value.length !== DEFAULT_ACTIVE_STATUSES.length) return true
+  return !DEFAULT_ACTIVE_STATUSES.every(s => selectedStatuses.value.includes(s))
+})
+
+const hasActiveFilters = computed(() => {
+  return (
+    initiativeSearch.value.trim() !== ''
+    || isStatusFiltered.value
+    || selectedTechnicalOwner.value !== 'all'
+    || selectedPriority.value !== 'all'
+  )
+})
+
+const technicalOwnersList = computed(() => {
+  const map = new Map<string, { id: string, name: string, photoUrl: string | null }>()
+  for (const u of users.value) {
+    map.set(u.id, {
+      id: u.id,
+      name: u.displayName || u.email,
+      photoUrl: u.photoUrl
+    })
+  }
+  for (const item of initiatives.value) {
+    if (item.technicalOwner && !map.has(item.technicalOwner.id)) {
+      map.set(item.technicalOwner.id, {
+        id: item.technicalOwner.id,
+        name: item.technicalOwner.displayName || item.technicalOwner.email,
+        photoUrl: item.technicalOwner.photoUrl
+      })
+    }
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const selectedTechnicalOwnerLabel = computed(() => {
+  if (selectedTechnicalOwner.value === 'all') return 'Todos'
+  if (selectedTechnicalOwner.value === 'unassigned') return 'Sin asignar'
+  const found = technicalOwnersList.value.find(u => u.id === selectedTechnicalOwner.value)
+  return found ? found.name : selectedTechnicalOwner.value
+})
+
+const selectedPriorityLabel = computed(() => {
+  if (selectedPriority.value === 'all') return 'Todas'
+  return priorityBadge(selectedPriority.value).label
+})
+
+function resetAllFilters() {
+  initiativeSearch.value = ''
+  selectedStatuses.value = [...DEFAULT_ACTIVE_STATUSES]
+  selectedTechnicalOwner.value = 'all'
+  selectedPriority.value = 'all'
+}
+
+const filteredInitiatives = computed(() =>
+  filterActiveInitiatives(
+    initiatives.value,
+    selectedStatuses.value,
+    initiativeSearch.value,
+    selectedTechnicalOwner.value,
+    selectedPriority.value
+  )
+)
 
 function getMonday(date: Date): Date {
   const d = new Date(date)
@@ -41,7 +195,7 @@ function generateWeeks(start: Date, end: Date): Week[] {
 
 // Compute the global timeline dates and values
 const timelineData = computed(() => {
-  if (initiatives.value.length === 0) {
+  if (filteredInitiatives.value.length === 0) {
     const start = getMonday(new Date())
     const end = new Date(start.getTime() + 12 * 7 * 24 * 60 * 60 * 1000)
     return {
@@ -57,7 +211,7 @@ const timelineData = computed(() => {
   let latest = new Date(earliest.getTime() + 4 * 7 * 24 * 60 * 60 * 1000)
   let firstFound = false
 
-  const parsedItems = initiatives.value.map((item) => {
+  const parsedItems = filteredInitiatives.value.map((item) => {
     const start = new Date(item.createdAt)
 
     // Use committedDate, fallback to estimatedDate, then targetDate, then 4 weeks from start
@@ -164,9 +318,12 @@ function getHealthColorClass(health: string): string {
 
 watch(
   () => isAuthorized.value,
-  (authorized) => {
+  async (authorized) => {
     if (authorized) {
-      fetchInitiatives()
+      await Promise.all([
+        fetchInitiatives(),
+        fetchUsers()
+      ])
     }
   },
   { immediate: true }
@@ -212,6 +369,213 @@ watch(
         h1.text-3xl.font-bold.tracking-tight Línea de Tiempo (Gantt)
         p.text-sm.text-muted Cronograma y salud de las iniciativas usando sus fechas comprometidas.
 
+    //- Filter Toolbar
+    .flex.flex-col.gap-3.w-full.p-4.border.border-default.rounded-xl.bg-elevated
+      .flex.flex-wrap.items-center.justify-between.gap-3.w-full
+        .flex.flex-wrap.items-center.gap-2
+          //- Search box
+          UInput(
+            v-model="initiativeSearch"
+            placeholder="Buscar iniciativa..."
+            icon="i-lucide-search"
+            size="sm"
+            class="w-56 sm:w-64"
+          )
+
+          //- Show/Hide Ready Toolbar Action Button
+          UButton(
+            :icon="isReadyShown ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+            :label="isReadyShown ? 'Ocultar listas' : 'Mostrar listas'"
+            :color="isReadyShown ? 'primary' : 'neutral'"
+            :variant="isReadyShown ? 'subtle' : 'outline'"
+            size="sm"
+            @click="toggleReadyStatus"
+          )
+            template(#trailing)
+              UBadge(
+                :label="String(statusCounts.ready || 0)"
+                size="xs"
+                :color="isReadyShown ? 'primary' : 'neutral'"
+                variant="subtle"
+              )
+
+          //- Status Filter Popover
+          UPopover
+            UButton(
+              icon="i-lucide-filter"
+              :label="`Estado (${selectedStatuses.length})`"
+              size="sm"
+              :color="isStatusFiltered ? 'primary' : 'neutral'"
+              :variant="isStatusFiltered ? 'subtle' : 'outline'"
+            )
+            template(#content)
+              .p-3.space-y-3.w-64
+                .flex.items-center.justify-between.border-b.border-default.pb-2
+                  span.text-xs.font-semibold Filtrar estados
+                  .flex.items-center.gap-1
+                    UButton(label="Sin Listas" size="xs" variant="ghost" color="neutral" @click="selectDefaultActive")
+                    UButton(label="Todos" size="xs" variant="ghost" color="neutral" @click="selectAllStatuses")
+
+                .space-y-2
+                  .flex.items-center.justify-between(v-for="opt in ALL_STATUS_OPTIONS" :key="opt.value")
+                    UCheckbox(
+                      :model-value="selectedStatuses.includes(opt.value)"
+                      :label="opt.label"
+                      size="sm"
+                      @update:model-value="toggleStatus(opt.value)"
+                    )
+                    UBadge(
+                      :color="statusBadge(opt.value).color"
+                      :label="String(statusCounts[opt.value] || 0)"
+                      size="xs"
+                      variant="subtle"
+                    )
+
+          //- Priority Filter Popover
+          UPopover
+            UButton(
+              :icon="selectedPriority !== 'all' ? 'i-lucide-filter' : 'i-lucide-chevron-down'"
+              :label="selectedPriority !== 'all' ? `Prioridad: ${selectedPriorityLabel}` : 'Prioridad'"
+              size="sm"
+              :color="selectedPriority !== 'all' ? 'primary' : 'neutral'"
+              :variant="selectedPriority !== 'all' ? 'subtle' : 'outline'"
+            )
+            template(#content)
+              .p-2.space-y-1.w-48
+                .text-xs.font-semibold.px-2.py-1.border-b.border-default.text-muted Filtrar por prioridad
+                button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                  type="button"
+                  class="hover:bg-elevated"
+                  :class="{ 'font-semibold text-primary': selectedPriority === 'all' }"
+                  @click="selectedPriority = 'all'"
+                )
+                  span Todas
+                  UIcon.size-3.5(v-if="selectedPriority === 'all'" name="i-lucide-check" class="text-primary")
+                button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                  v-for="p in ALL_PRIORITY_OPTIONS"
+                  :key="p.value"
+                  type="button"
+                  class="hover:bg-elevated"
+                  :class="{ 'font-semibold text-primary': selectedPriority === p.value }"
+                  @click="selectedPriority = p.value"
+                )
+                  UBadge(:color="p.badge.color" :label="p.badge.label" size="xs" variant="subtle")
+                  UIcon.size-3.5(v-if="selectedPriority === p.value" name="i-lucide-check" class="text-primary")
+
+          //- Technical Owner Filter Popover
+          UPopover
+            UButton(
+              :icon="selectedTechnicalOwner !== 'all' ? 'i-lucide-filter' : 'i-lucide-chevron-down'"
+              :label="selectedTechnicalOwner !== 'all' ? `Resp: ${selectedTechnicalOwnerLabel}` : 'Resp. Técnico'"
+              size="sm"
+              :color="selectedTechnicalOwner !== 'all' ? 'primary' : 'neutral'"
+              :variant="selectedTechnicalOwner !== 'all' ? 'subtle' : 'outline'"
+            )
+            template(#content)
+              .p-2.space-y-1.w-64.max-h-72.overflow-y-auto
+                .text-xs.font-semibold.px-2.py-1.border-b.border-default.text-muted Filtrar resp. técnico
+                button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                  type="button"
+                  class="hover:bg-elevated"
+                  :class="{ 'font-semibold text-primary': selectedTechnicalOwner === 'all' }"
+                  @click="selectedTechnicalOwner = 'all'"
+                )
+                  span Todos los responsables
+                  UIcon.size-3.5(v-if="selectedTechnicalOwner === 'all'" name="i-lucide-check" class="text-primary")
+                button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                  type="button"
+                  class="hover:bg-elevated"
+                  :class="{ 'font-semibold text-primary': selectedTechnicalOwner === 'unassigned' }"
+                  @click="selectedTechnicalOwner = 'unassigned'"
+                )
+                  .flex.items-center.gap-2
+                    UIcon.size-3.5.text-muted(name="i-lucide-user-x")
+                    span Sin asignar
+                  UIcon.size-3.5(v-if="selectedTechnicalOwner === 'unassigned'" name="i-lucide-check" class="text-primary")
+                .border-t.border-default.my-1(v-if="technicalOwnersList.length > 0")
+                button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                  v-for="owner in technicalOwnersList"
+                  :key="owner.id"
+                  type="button"
+                  class="hover:bg-elevated"
+                  :class="{ 'font-semibold text-primary': selectedTechnicalOwner === owner.id }"
+                  @click="selectedTechnicalOwner = owner.id"
+                )
+                  .flex.items-center.gap-2.min-w-0.truncate
+                    UAvatar(
+                      :src="owner.photoUrl ?? undefined"
+                      :alt="owner.name"
+                      size="2xs"
+                    )
+                    span.truncate {{ owner.name }}
+                  UIcon.size-3.5.shrink-0(v-if="selectedTechnicalOwner === owner.id" name="i-lucide-check" class="text-primary")
+
+          //- Reset Filters Button
+          UButton(
+            v-if="hasActiveFilters"
+            icon="i-lucide-rotate-ccw"
+            label="Restablecer filtros"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            @click="resetAllFilters"
+          )
+
+        .flex.items-center.gap-2.text-xs.text-muted
+          span Mostrando {{ filteredInitiatives.length }} de {{ initiatives.length }} iniciativas
+
+      //- Active filter chips row
+      .flex.flex-wrap.items-center.gap-1.5.pt-2.border-t.border-default(v-if="hasActiveFilters")
+        span.text-xs.text-muted.font-medium Filtros activos:
+
+        //- Priority Chip
+        UBadge(
+          v-if="selectedPriority !== 'all'"
+          size="xs"
+          color="primary"
+          variant="subtle"
+          class="gap-1 cursor-pointer"
+          @click="selectedPriority = 'all'"
+        )
+          span Prioridad: {{ selectedPriorityLabel }}
+          UIcon.size-3(name="i-lucide-x")
+
+        //- Technical Owner Chip
+        UBadge(
+          v-if="selectedTechnicalOwner !== 'all'"
+          size="xs"
+          color="primary"
+          variant="subtle"
+          class="gap-1 cursor-pointer"
+          @click="selectedTechnicalOwner = 'all'"
+        )
+          span Resp: {{ selectedTechnicalOwnerLabel }}
+          UIcon.size-3(name="i-lucide-x")
+
+        //- Status Chip
+        UBadge(
+          v-if="isStatusFiltered"
+          size="xs"
+          color="primary"
+          variant="subtle"
+          class="gap-1 cursor-pointer"
+          @click="selectDefaultActive"
+        )
+          span Estados ({{ selectedStatuses.length }})
+          UIcon.size-3(name="i-lucide-x")
+
+        //- Search Chip
+        UBadge(
+          v-if="initiativeSearch.trim()"
+          size="xs"
+          color="primary"
+          variant="subtle"
+          class="gap-1 cursor-pointer"
+          @click="initiativeSearch = ''"
+        )
+          span "{{ initiativeSearch }}"
+          UIcon.size-3(name="i-lucide-x")
+
     .flex.items-center.justify-center.py-16(v-if="isLoading")
       UIcon.size-6.animate-spin.text-muted(name="i-lucide-loader-circle")
 
@@ -223,9 +587,26 @@ watch(
       :title="errorMessage"
     )
 
-    .text-center.py-16.border.border-dashed.border-default.rounded-xl(v-else-if="processedInitiatives.length === 0")
-      UIcon.size-8.text-dimmed(name="i-lucide-calendar")
-      p.text-sm.text-dimmed.mt-2 No hay iniciativas para mostrar en la línea de tiempo.
+    .text-center.py-16.border.border-dashed.border-default.rounded-xl.space-y-3(v-else-if="processedInitiatives.length === 0")
+      UIcon.size-8.text-dimmed.mx-auto(name="i-lucide-calendar")
+      p.text-sm.text-dimmed No hay iniciativas para mostrar con los filtros aplicados.
+      .flex.items-center.justify-center.gap-2(v-if="hasActiveFilters")
+        UButton(
+          v-if="!isReadyShown && statusCounts.ready > 0"
+          label="Mostrar iniciativas listas"
+          icon="i-lucide-eye"
+          size="xs"
+          color="primary"
+          variant="soft"
+          @click="toggleReadyStatus"
+        )
+        UButton(
+          label="Restablecer filtros"
+          size="xs"
+          color="neutral"
+          variant="outline"
+          @click="resetAllFilters"
+        )
 
     //- Gantt view container
     .flex.border.border-default.rounded-xl.overflow-hidden.bg-elevated(v-else class="max-w-full")
