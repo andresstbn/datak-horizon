@@ -407,7 +407,7 @@ watch(
                   span Mostrando {{ activeInitiatives.length }} de {{ initiativesList.length }} iniciativas
 
               //- Active filter chips row
-              .flex.flex-wrap.items-center.gap-1.5.pt-1.border-t.border-default(v-if="hasActiveFilters")
+              .flex.flex-wrap.items-center.pt-1.border-t.border-default(v-if="hasActiveFilters" class="gap-1.5")
                 span.text-xs.text-muted.font-medium Filtros activos:
 
                 //- Priority Chip
@@ -497,8 +497,9 @@ watch(
                     //- Prioridad Column Header Filter
                     .flex.justify-center
                       UPopover
-                        button.flex.items-center.gap-1.transition.rounded.px-1.5.py-0.5(
+                        button.flex.items-center.gap-1.transition.rounded(
                           type="button"
+                          class="px-1.5 py-0.5"
                           :class="selectedPriority !== 'all' ? 'text-primary font-bold bg-primary/10' : 'text-muted hover:text-foreground hover:bg-elevated/60'"
                         )
                           span Prioridad
@@ -509,30 +510,31 @@ watch(
                         template(#content)
                           .p-2.space-y-1.w-48
                             .text-xs.font-semibold.px-2.py-1.border-b.border-default.text-muted Filtrar por prioridad
-                            button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
                               type="button"
-                              class="hover:bg-elevated"
+                              class="px-2 py-1.5 hover:bg-elevated"
                               :class="{ 'font-semibold text-primary': selectedPriority === 'all' }"
                               @click="selectedPriority = 'all'"
                             )
                               span Todas
-                              UIcon.size-3.5(v-if="selectedPriority === 'all'" name="i-lucide-check" class="text-primary")
-                            button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                              UIcon(v-if="selectedPriority === 'all'" name="i-lucide-check" class="size-3.5 text-primary")
+                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
                               v-for="p in ALL_PRIORITY_OPTIONS"
                               :key="p.value"
                               type="button"
-                              class="hover:bg-elevated"
+                              class="px-2 py-1.5 hover:bg-elevated"
                               :class="{ 'font-semibold text-primary': selectedPriority === p.value }"
                               @click="selectedPriority = p.value"
                             )
                               UBadge(:color="p.badge.color" :label="p.badge.label" size="xs" variant="subtle")
-                              UIcon.size-3.5(v-if="selectedPriority === p.value" name="i-lucide-check" class="text-primary")
+                              UIcon(v-if="selectedPriority === p.value" name="i-lucide-check" class="size-3.5 text-primary")
 
                     //- Resp. Técnico Column Header Filter
                     .flex.justify-start
                       UPopover
-                        button.flex.items-center.gap-1.transition.rounded.px-1.5.py-0.5(
+                        button.flex.items-center.gap-1.transition.rounded(
                           type="button"
+                          class="px-1.5 py-0.5"
                           :class="selectedTechnicalOwner !== 'all' ? 'text-primary font-bold bg-primary/10' : 'text-muted hover:text-foreground hover:bg-elevated/60'"
                         )
                           span Resp. Técnico
@@ -543,30 +545,30 @@ watch(
                         template(#content)
                           .p-2.space-y-1.w-64.max-h-72.overflow-y-auto
                             .text-xs.font-semibold.px-2.py-1.border-b.border-default.text-muted Filtrar resp. técnico
-                            button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
                               type="button"
-                              class="hover:bg-elevated"
+                              class="px-2 py-1.5 hover:bg-elevated"
                               :class="{ 'font-semibold text-primary': selectedTechnicalOwner === 'all' }"
                               @click="selectedTechnicalOwner = 'all'"
                             )
                               span Todos los responsables
-                              UIcon.size-3.5(v-if="selectedTechnicalOwner === 'all'" name="i-lucide-check" class="text-primary")
-                            button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                              UIcon(v-if="selectedTechnicalOwner === 'all'" name="i-lucide-check" class="size-3.5 text-primary")
+                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
                               type="button"
-                              class="hover:bg-elevated"
+                              class="px-2 py-1.5 hover:bg-elevated"
                               :class="{ 'font-semibold text-primary': selectedTechnicalOwner === 'unassigned' }"
                               @click="selectedTechnicalOwner = 'unassigned'"
                             )
                               .flex.items-center.gap-2
-                                UIcon.size-3.5.text-muted(name="i-lucide-user-x")
+                                UIcon.text-muted(name="i-lucide-user-x" class="size-3.5")
                                 span Sin asignar
-                              UIcon.size-3.5(v-if="selectedTechnicalOwner === 'unassigned'" name="i-lucide-check" class="text-primary")
+                              UIcon(v-if="selectedTechnicalOwner === 'unassigned'" name="i-lucide-check" class="size-3.5 text-primary")
                             .border-t.border-default.my-1(v-if="technicalOwnersList.length > 0")
-                            button.flex.items-center.justify-between.w-full.px-2.py-1.5.text-xs.rounded.transition(
+                            button.flex.items-center.justify-between.w-full.text-xs.rounded.transition(
                               v-for="owner in technicalOwnersList"
                               :key="owner.id"
                               type="button"
-                              class="hover:bg-elevated"
+                              class="px-2 py-1.5 hover:bg-elevated"
                               :class="{ 'font-semibold text-primary': selectedTechnicalOwner === owner.id }"
                               @click="selectedTechnicalOwner = owner.id"
                             )
@@ -577,13 +579,14 @@ watch(
                                   size="2xs"
                                 )
                                 span.truncate {{ owner.name }}
-                              UIcon.size-3.5.shrink-0(v-if="selectedTechnicalOwner === owner.id" name="i-lucide-check" class="text-primary")
+                              UIcon(v-if="selectedTechnicalOwner === owner.id" name="i-lucide-check" class="size-3.5 shrink-0 text-primary")
 
                     //- Estado Column Header Filter
                     .flex.justify-center
                       UPopover
-                        button.flex.items-center.gap-1.transition.rounded.px-1.5.py-0.5(
+                        button.flex.items-center.gap-1.transition.rounded(
                           type="button"
+                          class="px-1.5 py-0.5"
                           :class="isStatusFiltered ? 'text-primary font-bold bg-primary/10' : 'text-muted hover:text-foreground hover:bg-elevated/60'"
                         )
                           span Estado
