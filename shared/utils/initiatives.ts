@@ -178,24 +178,33 @@ export function filterActiveInitiatives(
   items: InitiativeListItem[],
   statuses: InitiativeStatus[],
   search: string,
-  technicalOwnerId: string = 'all',
-  priority: PriorityLevel | 'all' = 'all'
+  technicalOwnerIds: string[] | string = 'all',
+  priorities: PriorityLevel[] | PriorityLevel | 'all' = 'all'
 ): InitiativeListItem[] {
   const query = search.trim().toLowerCase()
+
+  // Normalize technicalOwnerIds
+  const owners: string[] = Array.isArray(technicalOwnerIds)
+    ? technicalOwnerIds
+    : (technicalOwnerIds === 'all' ? [] : [technicalOwnerIds])
+
+  // Normalize priorities
+  const prios: PriorityLevel[] = Array.isArray(priorities)
+    ? priorities
+    : (priorities === 'all' ? [] : [priorities])
 
   return items.filter((item) => {
     if (!statuses.includes(item.status)) {
       return false
     }
-    if (priority !== 'all' && item.priority !== priority) {
+    if (prios.length > 0 && !prios.includes(item.priority)) {
       return false
     }
-    if (technicalOwnerId !== 'all') {
-      if (technicalOwnerId === 'unassigned') {
-        if (item.technicalOwner !== null) {
-          return false
-        }
-      } else if (item.technicalOwner?.id !== technicalOwnerId) {
+    if (owners.length > 0) {
+      const isUnassigned = item.technicalOwner === null
+      const matchesUnassigned = isUnassigned && owners.includes('unassigned')
+      const matchesOwner = item.technicalOwner !== null && owners.includes(item.technicalOwner.id)
+      if (!matchesUnassigned && !matchesOwner) {
         return false
       }
     }
