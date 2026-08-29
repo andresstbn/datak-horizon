@@ -250,7 +250,7 @@ function setStatusFilter(status: string | 'all') {
         @click="handleSelect(item)"
       )
         .flex.items-center.justify-between.gap-2.mb-1
-          .flex.items-center.gap-1.5
+          .flex.items-center(class="gap-1.5")
             DocTypeBadge(:tipo="item.tipo" size="xs")
             span.font-mono.text-xs.font-bold.text-foreground {{ item.id }}
           DocStatusBadge(:status="item.estado" size="xs")
