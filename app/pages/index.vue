@@ -177,7 +177,7 @@ const technicalOwnerCounts = computed(() => {
     if (item.technicalOwner) {
       counts[item.technicalOwner.id] = (counts[item.technicalOwner.id] || 0) + 1
     } else {
-      counts.unassigned++
+      counts.unassigned = (counts.unassigned ?? 0) + 1
     }
   }
   return counts

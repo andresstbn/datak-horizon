@@ -28,6 +28,7 @@ locals {
   secret_env = {
     DATABASE_URL              = google_secret_manager_secret.db_url.secret_id
     NUXT_CONFLUENCE_API_TOKEN = google_secret_manager_secret.confluence_api_token.secret_id
+    NUXT_GITHUB_TOKEN         = google_secret_manager_secret.github_token.secret_id
     NUXT_SLACK_WEBHOOK_URL    = google_secret_manager_secret.slack_webhook_url.secret_id
   }
 }
@@ -60,6 +61,13 @@ resource "google_secret_manager_secret" "confluence_api_token" {
   }
 }
 
+resource "google_secret_manager_secret" "github_token" {
+  secret_id = "horizon_github_token"
+  replication {
+    auto {}
+  }
+}
+
 resource "google_secret_manager_secret" "slack_webhook_url" {
   secret_id = "horizon_slack_webhook_url"
   replication {
@@ -72,6 +80,7 @@ resource "google_secret_manager_secret_iam_member" "run_accessor" {
     google_secret_manager_secret.db_url.secret_id,
     google_secret_manager_secret.slack_webhook_url.secret_id,
     google_secret_manager_secret.confluence_api_token.secret_id,
+    google_secret_manager_secret.github_token.secret_id,
   ])
   secret_id = each.value
   role      = "roles/secretmanager.secretAccessor"

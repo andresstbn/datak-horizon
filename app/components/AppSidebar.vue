@@ -22,7 +22,12 @@ const items: RailItem[] = [
     to: '/timeline',
     match: path => path === '/timeline'
   },
-  { icon: 'i-lucide-clock', label: 'Actividad (próximamente)' }
+  {
+    icon: 'i-lucide-file-text',
+    label: 'Documentos',
+    to: '/docs',
+    match: path => path.startsWith('/docs')
+  }
 ]
 
 const route = useRoute()
