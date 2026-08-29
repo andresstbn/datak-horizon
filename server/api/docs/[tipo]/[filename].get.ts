@@ -1,4 +1,4 @@
-import { createError, defineEventHandler, getRouterParam } from 'h3'
+import { createError, defineEventHandler, getQuery, getRouterParam } from 'h3'
 import { requireAuth } from '../../../utils/auth'
 import { githubDocsService } from '../../../services/githubDocsService'
 import type { DocType } from '~~/shared/types/doc'
@@ -27,7 +27,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const doc = await githubDocsService.getDoc(tipo, filename)
+  const query = getQuery(event)
+  const force = query.force === 'true' || query.force === '1'
+
+  const doc = await githubDocsService.getDoc(tipo, filename, force)
   if (!doc) {
     throw createError({
       statusCode: 404,

@@ -13,6 +13,7 @@ const { isReady, isAuthenticated, isAuthorized, isAccessDenied, deniedEmail, log
 const {
   items,
   isLoading,
+  isSyncing,
   errorMessage,
   selectedDoc,
   isDetailLoading,
@@ -23,9 +24,19 @@ const {
   rfCount,
   specsCount,
   fetchDocs,
+  syncDocs,
   selectDoc,
   clearSelectedDoc
 } = useDocs()
+
+async function handleSync() {
+  await syncDocs()
+  toast.add({
+    title: 'Sincronizado',
+    description: 'Documentos actualizados desde GitHub.',
+    icon: 'i-lucide-check'
+  })
+}
 
 const { renderMarkdown } = useDocRenderer()
 
@@ -196,8 +207,19 @@ function setStatusFilter(status: string | 'all') {
           .flex.items-center.gap-2
             UIcon.size-5.text-primary(name="i-lucide-book-open")
             h2.font-semibold.text-foreground Documentos
-          UBadge(color="neutral" variant="subtle" size="sm")
-            | {{ `${filtered.length} / ${items.length}` }}
+          .flex.items-center(class="gap-1.5")
+            UBadge(color="neutral" variant="subtle" size="sm")
+              | {{ `${filtered.length} / ${items.length}` }}
+            UTooltip(text="Sincronizar con GitHub")
+              UButton(
+                icon="i-lucide-refresh-cw"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                :loading="isSyncing"
+                aria-label="Sincronizar con GitHub"
+                @click="handleSync"
+              )
 
         //- Search Input
         UInput(
@@ -353,6 +375,16 @@ function setStatusFilter(status: string | 'all') {
               | {{ `docs/${selectedDoc.tipo}/${selectedDoc.filename}` }}
 
           .flex.items-center.gap-2
+            UTooltip(text="Sincronizar con GitHub")
+              UButton(
+                icon="i-lucide-refresh-cw"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                :loading="isSyncing"
+                aria-label="Sincronizar con GitHub"
+                @click="handleSync"
+              )
             UButton(
               icon="i-lucide-link"
               label="Copiar enlace"

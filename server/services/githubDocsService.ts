@@ -40,82 +40,84 @@ const GITHUB_REPO_OWNER = 'Datak-SAS'
 const GITHUB_REPO_NAME = 'datak'
 const GITHUB_BRANCH = 'main'
 
+async function fetchRawDocsTree(token: string): Promise<RawDocsCache> {
+  const query = `
+    query GetMonorepoDocsTree($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
+        rf: object(expression: "${GITHUB_BRANCH}:docs/rf") {
+          ... on Tree {
+            entries {
+              name
+              object {
+                ... on Blob {
+                  text
+                }
+              }
+            }
+          }
+        }
+        specs: object(expression: "${GITHUB_BRANCH}:docs/specs") {
+          ... on Tree {
+            entries {
+              name
+              object {
+                ... on Blob {
+                  text
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `
+
+  const response = await $fetch<GitHubGraphQLResponse>(GITHUB_GRAPHQL_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'Datak-Horizon-Docs-Viewer'
+    },
+    body: {
+      query,
+      variables: {
+        owner: GITHUB_REPO_OWNER,
+        name: GITHUB_REPO_NAME
+      }
+    }
+  })
+
+  if (response.errors && response.errors.length > 0) {
+    const msg = response.errors.map(e => e.message).join(', ')
+    if (msg.includes('Resource not accessible by personal access token')) {
+      throw new Error(
+        'El token de GitHub no tiene permisos de lectura sobre el contenido (Contents: Read-only) o requiere aprobación del administrador en Datak-SAS.'
+      )
+    }
+    throw new Error(`GitHub GraphQL error: ${msg}`)
+  }
+
+  const rfEntries = response.data?.repository?.rf?.entries ?? []
+  const specsEntries = response.data?.repository?.specs?.entries ?? []
+
+  const rf = rfEntries
+    .filter(e => e.name.endsWith('.md') && e.object?.text)
+    .map(e => ({ name: e.name, text: e.object!.text! }))
+
+  const specs = specsEntries
+    .filter(e => e.name.endsWith('.md') && e.object?.text)
+    .map(e => ({ name: e.name, text: e.object!.text! }))
+
+  return { rf, specs }
+}
+
 /**
  * Nitro cached function to fetch all docs in a single GraphQL query.
  * Cached for 5 minutes (TTL 300s).
  */
 const fetchRawDocsTreeCached = defineCachedFunction(
-  async (token: string): Promise<RawDocsCache> => {
-    const query = `
-      query GetMonorepoDocsTree($owner: String!, $name: String!) {
-        repository(owner: $owner, name: $name) {
-          rf: object(expression: "${GITHUB_BRANCH}:docs/rf") {
-            ... on Tree {
-              entries {
-                name
-                object {
-                  ... on Blob {
-                    text
-                  }
-                }
-              }
-            }
-          }
-          specs: object(expression: "${GITHUB_BRANCH}:docs/specs") {
-            ... on Tree {
-              entries {
-                name
-                object {
-                  ... on Blob {
-                    text
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    `
-
-    const response = await $fetch<GitHubGraphQLResponse>(GITHUB_GRAPHQL_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Datak-Horizon-Docs-Viewer'
-      },
-      body: {
-        query,
-        variables: {
-          owner: GITHUB_REPO_OWNER,
-          name: GITHUB_REPO_NAME
-        }
-      }
-    })
-
-    if (response.errors && response.errors.length > 0) {
-      const msg = response.errors.map(e => e.message).join(', ')
-      if (msg.includes('Resource not accessible by personal access token')) {
-        throw new Error(
-          'El token de GitHub no tiene permisos de lectura sobre el contenido (Contents: Read-only) o requiere aprobación del administrador en Datak-SAS.'
-        )
-      }
-      throw new Error(`GitHub GraphQL error: ${msg}`)
-    }
-
-    const rfEntries = response.data?.repository?.rf?.entries ?? []
-    const specsEntries = response.data?.repository?.specs?.entries ?? []
-
-    const rf = rfEntries
-      .filter(e => e.name.endsWith('.md') && e.object?.text)
-      .map(e => ({ name: e.name, text: e.object!.text! }))
-
-    const specs = specsEntries
-      .filter(e => e.name.endsWith('.md') && e.object?.text)
-      .map(e => ({ name: e.name, text: e.object!.text! }))
-
-    return { rf, specs }
-  },
+  fetchRawDocsTree,
   {
     maxAge: 60 * 5, // 5 minutes
     name: 'githubDocsTree',
@@ -219,10 +221,13 @@ function sortDocsRecentFirst(a: DocIndexItem, b: DocIndexItem): number {
 export const githubDocsService = {
   /**
    * Retrieves the combined index of RF and SPEC documents, ordered most recent first.
+   * @param force If true, fetches directly from GitHub bypassing Nitro cached function.
    */
-  async listDocs(): Promise<DocIndexItem[]> {
+  async listDocs(force = false): Promise<DocIndexItem[]> {
     const token = getGitHubToken()
-    const raw = await fetchRawDocsTreeCached(token)
+    const raw = force
+      ? await fetchRawDocsTree(token)
+      : await fetchRawDocsTreeCached(token)
 
     const rfDocs = buildIndexFromCategory(raw.rf, 'rf').sort(sortDocsRecentFirst)
     const specsDocs = buildIndexFromCategory(raw.specs, 'specs').sort(sortDocsRecentFirst)
@@ -232,10 +237,13 @@ export const githubDocsService = {
 
   /**
    * Retrieves a single document by type ('rf' | 'specs') and filename.
+   * @param force If true, fetches fresh document tree directly from GitHub.
    */
-  async getDoc(tipo: DocType, filename: string): Promise<DocDetail | null> {
+  async getDoc(tipo: DocType, filename: string, force = false): Promise<DocDetail | null> {
     const token = getGitHubToken()
-    const raw = await fetchRawDocsTreeCached(token)
+    const raw = force
+      ? await fetchRawDocsTree(token)
+      : await fetchRawDocsTreeCached(token)
 
     const categoryEntries = tipo === 'rf' ? raw.rf : raw.specs
     const entry = categoryEntries.find(e => e.name === filename || e.name === `${filename}.md`)
