@@ -95,6 +95,11 @@ const fetchRawDocsTreeCached = defineCachedFunction(
 
     if (response.errors && response.errors.length > 0) {
       const msg = response.errors.map(e => e.message).join(', ')
+      if (msg.includes('Resource not accessible by personal access token')) {
+        throw new Error(
+          'El token de GitHub no tiene permisos de lectura sobre el contenido (Contents: Read-only) o requiere aprobación del administrador en Datak-SAS.'
+        )
+      }
       throw new Error(`GitHub GraphQL error: ${msg}`)
     }
 
