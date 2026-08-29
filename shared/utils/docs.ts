@@ -42,7 +42,7 @@ export function docTypeBadge(type: DocType): BadgeConfig & { description: string
 export function filterDocs(items: DocIndexItem[], filters: DocFilters): DocIndexItem[] {
   return items.filter((item) => {
     // Type filter
-    if (filters.tipo !== 'all' && item.tipo !== filters.tipo) {
+    if (item.tipo !== filters.tipo) {
       return false
     }
 

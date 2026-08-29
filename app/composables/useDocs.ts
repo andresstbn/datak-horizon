@@ -14,7 +14,7 @@ export function useDocs() {
   const detailError = useState<string | null>('docs:detailError', () => null)
 
   const filters = useState<DocFilters>('docs:filters', () => ({
-    tipo: 'all',
+    tipo: 'rf',
     estado: 'all',
     search: ''
   }))

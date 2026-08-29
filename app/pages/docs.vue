@@ -140,7 +140,7 @@ async function copyDocumentLink() {
   }
 }
 
-function setTipoFilter(tipo: DocType | 'all') {
+function setTipoFilter(tipo: DocType) {
   filters.value.tipo = tipo
 }
 
@@ -208,16 +208,8 @@ function setStatusFilter(status: string | 'all') {
           class="w-full"
         )
 
-        //- Type Filters
+        //- Type Filters (RF / SPEC)
         .flex.items-center.gap-1.rounded-lg.bg-muted.p-1(class="bg-opacity-20")
-          UButton(
-            label="Todos"
-            size="xs"
-            class="flex-1 justify-center"
-            :variant="filters.tipo === 'all' ? 'solid' : 'ghost'"
-            :color="filters.tipo === 'all' ? 'primary' : 'neutral'"
-            @click="setTipoFilter('all')"
-          )
           UButton(
             :label="`RF (${rfCount})`"
             size="xs"
@@ -276,11 +268,11 @@ function setStatusFilter(status: string | 'all') {
           UIcon.size-8.text-muted.mx-auto.mb-2(name="i-lucide-file-x")
           p.text-sm.text-muted No se encontraron documentos.
           UButton.mt-2(
-            v-if="filters.search || filters.tipo !== 'all' || filters.estado !== 'all'"
+            v-if="filters.search || filters.estado !== 'all'"
             label="Limpiar filtros"
             size="xs"
             variant="link"
-            @click="filters.search = ''; filters.tipo = 'all'; filters.estado = 'all'"
+            @click="filters.search = ''; filters.estado = 'all'"
           )
 
         //- Document Cards

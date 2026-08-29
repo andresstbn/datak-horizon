@@ -43,7 +43,7 @@ export interface DocDetail {
 }
 
 export interface DocFilters {
-  tipo: DocType | 'all'
+  tipo: DocType
   estado: string | 'all'
   search: string
 }

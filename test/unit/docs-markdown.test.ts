@@ -147,21 +147,21 @@ describe('filterDocs', () => {
   })
 
   it('filters by status', () => {
-    const aprobadas = filterDocs(sampleDocs, { tipo: 'all', estado: 'APROBADA', search: '' })
+    const aprobadas = filterDocs(sampleDocs, { tipo: 'rf', estado: 'APROBADA', search: '' })
     expect(aprobadas.length).toBe(1)
     expect(aprobadas[0]?.id).toBe('RF-001')
   })
 
   it('filters by search keyword across id, title, authors, filename', () => {
-    const searchAuth = filterDocs(sampleDocs, { tipo: 'all', estado: 'all', search: 'google' })
+    const searchAuth = filterDocs(sampleDocs, { tipo: 'rf', estado: 'all', search: 'google' })
     expect(searchAuth.length).toBe(1)
     expect(searchAuth[0]?.id).toBe('RF-001')
 
-    const searchAuthor = filterDocs(sampleDocs, { tipo: 'all', estado: 'all', search: 'camilo' })
+    const searchAuthor = filterDocs(sampleDocs, { tipo: 'rf', estado: 'all', search: 'camilo' })
     expect(searchAuthor.length).toBe(1)
     expect(searchAuthor[0]?.id).toBe('RF-002')
 
-    const searchId = filterDocs(sampleDocs, { tipo: 'all', estado: 'all', search: 'SPEC-001' })
+    const searchId = filterDocs(sampleDocs, { tipo: 'specs', estado: 'all', search: 'SPEC-001' })
     expect(searchId.length).toBe(1)
   })
 })

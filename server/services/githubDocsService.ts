@@ -202,21 +202,32 @@ function buildIndexFromCategory(
   })
 }
 
+function sortDocsRecentFirst(a: DocIndexItem, b: DocIndexItem): number {
+  if (a.fecha && b.fecha) {
+    const dateDiff = b.fecha.localeCompare(a.fecha)
+    if (dateDiff !== 0) return dateDiff
+  } else if (a.fecha && !b.fecha) {
+    return -1
+  } else if (!a.fecha && b.fecha) {
+    return 1
+  }
+
+  // Fallback: natural sort by id descending (e.g. RF-010 before RF-002)
+  return b.id.localeCompare(a.id, undefined, { numeric: true })
+}
+
 export const githubDocsService = {
   /**
-   * Retrieves the combined index of RF and SPEC documents.
+   * Retrieves the combined index of RF and SPEC documents, ordered most recent first.
    */
   async listDocs(): Promise<DocIndexItem[]> {
     const token = getGitHubToken()
     const raw = await fetchRawDocsTreeCached(token)
 
-    const rfDocs = buildIndexFromCategory(raw.rf, 'rf')
-    const specsDocs = buildIndexFromCategory(raw.specs, 'specs')
+    const rfDocs = buildIndexFromCategory(raw.rf, 'rf').sort(sortDocsRecentFirst)
+    const specsDocs = buildIndexFromCategory(raw.specs, 'specs').sort(sortDocsRecentFirst)
 
-    const combined = [...rfDocs, ...specsDocs]
-
-    // Sort by id naturally (e.g. RF-001, RF-002, SPEC-001)
-    return combined.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
+    return [...rfDocs, ...specsDocs]
   },
 
   /**
