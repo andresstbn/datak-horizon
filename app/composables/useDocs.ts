@@ -34,7 +34,10 @@ export function useDocs() {
       items.value = await docService.list(token)
     } catch (err: unknown) {
       console.error('Error fetching docs index:', err)
-      errorMessage.value = 'No se pudieron cargar los documentos del monorepo.'
+      const dataMsg = (err as { data?: { statusMessage?: string, message?: string } })?.data?.statusMessage
+        || (err as { statusMessage?: string })?.statusMessage
+        || (err as Error)?.message
+      errorMessage.value = dataMsg || 'No se pudieron cargar los documentos del monorepo.'
       items.value = []
     } finally {
       isLoading.value = false

@@ -8,6 +8,8 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
+const { isReady, isAuthenticated, isAuthorized, isAccessDenied, deniedEmail, logout } = useAuth()
+
 const {
   items,
   isLoading,
@@ -87,9 +89,15 @@ watch(
   }
 )
 
-onMounted(async () => {
-  await syncFromRoute()
-})
+watch(
+  () => isAuthorized.value,
+  async (authorized) => {
+    if (authorized) {
+      await syncFromRoute()
+    }
+  },
+  { immediate: true }
+)
 
 function handleSelect(item: DocIndexItem) {
   router.replace({
@@ -142,12 +150,46 @@ function setStatusFilter(status: string | 'all') {
 </script>
 
 <template lang="pug">
-.flex.h-full.w-full.gap-4.overflow-hidden
-  //- Left Master Column / Document List (hidden on small screens when doc is active)
-  .flex.h-full.w-full.flex-col.overflow-hidden.rounded-xl.border.border-default.bg-elevated(
-    class="md:w-80 lg:w-96 md:shrink-0"
-    :class="selectedDoc ? 'hidden md:flex' : 'flex'"
+.space-y-4
+  //- Wait for the auth state before deciding what to render.
+  .flex.items-center.justify-center.py-16(v-if="!isReady")
+    UIcon.size-6.animate-spin.text-muted(name="i-lucide-loader-circle")
+
+  UAlert(
+    v-else-if="!isAuthenticated"
+    color="neutral"
+    variant="subtle"
+    icon="i-lucide-lock"
+    title="Inicia sesión"
+    description="Entra con tu cuenta de Google para ver los documentos de producto."
   )
+
+  .space-y-4(v-else-if="isAccessDenied")
+    UAlert(
+      color="error"
+      variant="subtle"
+      icon="i-lucide-shield-alert"
+      title="Acceso restringido"
+      :description="`Tu cuenta de Google (${deniedEmail ?? 'autenticada'}) no está autorizada para acceder a Datak Horizon.`"
+    )
+    .flex.justify-start
+      UButton(
+        icon="i-lucide-log-out"
+        label="Cerrar sesión"
+        color="neutral"
+        variant="outline"
+        @click="logout"
+      )
+
+  .flex.w-full.gap-4.overflow-hidden(
+    v-else-if="isAuthorized"
+    class="h-[calc(100vh-7rem)]"
+  )
+    //- Left Master Column / Document List (hidden on small screens when doc is active)
+    .flex.h-full.w-full.flex-col.overflow-hidden.rounded-xl.border.border-default.bg-elevated(
+      class="md:w-80 lg:w-96 md:shrink-0"
+      :class="selectedDoc ? 'hidden md:flex' : 'flex'"
+    )
     //- Header & Filters
     .flex.flex-col.gap-3.border-b.border-default.p-4
       .flex.items-center.justify-between
