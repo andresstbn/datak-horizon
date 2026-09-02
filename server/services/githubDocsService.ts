@@ -2,8 +2,8 @@ import type { DocBranch, DocDetail, DocIndexItem, DocType } from '~~/shared/type
 import { parseFrontmatter } from '~~/shared/utils/frontmatter'
 import {
   DEFAULT_DOC_BRANCH,
-  pickBranchesWithDocChanges,
-  type RefDocTrees
+  pickDocBranchesFromPullRequests,
+  type PullRequestDocFiles
 } from '~~/shared/utils/docs'
 import {
   GITHUB_REPO_NAME,
@@ -45,18 +45,12 @@ interface CachedAsset {
 
 interface BranchesData {
   repository?: {
-    mainRf?: { oid?: string } | null
-    mainSpecs?: { oid?: string } | null
-    refs?: {
+    pullRequests?: {
       nodes?: Array<{
-        name: string
-        target?: {
-          rf?: { oid?: string } | null
-          specs?: { oid?: string } | null
-        } | null
-        associatedPullRequests?: {
-          nodes?: Array<{ number: number, title: string }>
-        } | null
+        number: number
+        title: string
+        headRefName: string
+        files?: { nodes?: Array<{ path: string }> } | null
       }>
     } | null
   } | null
@@ -94,27 +88,16 @@ const DOCS_TREE_QUERY = `
 `
 
 const BRANCHES_QUERY = `
-  query GetDocsBranches($owner: String!, $name: String!, $mainRfExpr: String!, $mainSpecsExpr: String!) {
+  query GetDocsBranches($owner: String!, $name: String!) {
     repository(owner: $owner, name: $name) {
-      mainRf: object(expression: $mainRfExpr) {
-        ... on Tree { oid }
-      }
-      mainSpecs: object(expression: $mainSpecsExpr) {
-        ... on Tree { oid }
-      }
-      refs(refPrefix: "refs/heads/", first: 30, orderBy: { field: TAG_COMMIT_DATE, direction: DESC }) {
+      pullRequests(states: OPEN, first: 60, orderBy: { field: UPDATED_AT, direction: DESC }) {
         nodes {
-          name
-          target {
-            ... on Commit {
-              rf: file(path: "docs/rf") { oid }
-              specs: file(path: "docs/specs") { oid }
-            }
-          }
-          associatedPullRequests(first: 1, states: OPEN) {
+          number
+          title
+          headRefName
+          files(first: 100) {
             nodes {
-              number
-              title
+              path
             }
           }
         }
@@ -256,28 +239,19 @@ const listBranchesCached = defineCachedFunction(
   async (token: string): Promise<DocBranch[]> => {
     const data = await githubGraphql<BranchesData>(token, BRANCHES_QUERY, {
       owner: GITHUB_REPO_OWNER,
-      name: GITHUB_REPO_NAME,
-      mainRfExpr: `${DEFAULT_DOC_BRANCH}:docs/rf`,
-      mainSpecsExpr: `${DEFAULT_DOC_BRANCH}:docs/specs`
+      name: GITHUB_REPO_NAME
     })
 
-    const repo = data.repository
-    const main = {
-      rfOid: repo?.mainRf?.oid ?? null,
-      specsOid: repo?.mainSpecs?.oid ?? null
-    }
+    // ponytail: only the first 100 changed paths per PR are inspected. A PR that
+    // touches a doc beyond that would be missed; paginate `files` if it happens.
+    const pullRequests: PullRequestDocFiles[] = (data.repository?.pullRequests?.nodes ?? []).map(pr => ({
+      number: pr.number,
+      title: pr.title,
+      headRefName: pr.headRefName,
+      filePaths: (pr.files?.nodes ?? []).map(f => f.path)
+    }))
 
-    const refs: RefDocTrees[] = (repo?.refs?.nodes ?? []).map((node) => {
-      const pr = node.associatedPullRequests?.nodes?.[0]
-      return {
-        name: node.name,
-        rfOid: node.target?.rf?.oid ?? null,
-        specsOid: node.target?.specs?.oid ?? null,
-        ...(pr ? { prNumber: pr.number, prTitle: pr.title } : {})
-      }
-    })
-
-    return pickBranchesWithDocChanges(main, refs)
+    return pickDocBranchesFromPullRequests(pullRequests)
   },
   {
     maxAge: 60 * 5, // 5 minutes

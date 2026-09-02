@@ -1,59 +1,83 @@
 import { describe, expect, it } from 'vitest'
 import {
   docCommentMarker,
-  pickBranchesWithDocChanges,
+  isProductDocPath,
+  pickDocBranchesFromPullRequests,
   resolveDocAsset,
   resolveDocLink,
   stripDocCommentMarker,
-  type RefDocTrees
+  type PullRequestDocFiles
 } from '../../shared/utils/docs'
 
-const main = { rfOid: 'rf-main', specsOid: 'specs-main' }
-
-function ref(partial: Partial<RefDocTrees> & { name: string }): RefDocTrees {
-  return { rfOid: 'rf-main', specsOid: 'specs-main', ...partial }
+function pr(partial: Partial<PullRequestDocFiles> & { headRefName: string }): PullRequestDocFiles {
+  return { number: 1, title: 'PR', filePaths: [], ...partial }
 }
 
-describe('pickBranchesWithDocChanges', () => {
+describe('isProductDocPath', () => {
+  it('matches the files the viewer renders and nothing else', () => {
+    expect(isProductDocPath('docs/rf/RF-012.md')).toBe(true)
+    expect(isProductDocPath('docs/specs/SPEC-181.md')).toBe(true)
+    expect(isProductDocPath('docs/adr/ADR-003.md')).toBe(false)
+    expect(isProductDocPath('server/services/foo.ts')).toBe(false)
+    expect(isProductDocPath('docs/rfc-notes.md')).toBe(false)
+  })
+})
+
+describe('pickDocBranchesFromPullRequests', () => {
   it('always offers the default branch first', () => {
-    expect(pickBranchesWithDocChanges(main, [])).toEqual([{ name: 'main' }])
+    expect(pickDocBranchesFromPullRequests([])).toEqual([{ name: 'main' }])
   })
 
-  it('drops branches whose docs trees match the default branch', () => {
-    const result = pickBranchesWithDocChanges(main, [ref({ name: 'chore/ci' })])
+  it('offers the head of an open PR that touches a SPEC', () => {
+    // Regression: Datak-SAS/datak#85 met the criterion and never appeared.
+    const result = pickDocBranchesFromPullRequests([
+      pr({
+        number: 85,
+        title: 'SPEC-181: Núcleo hotelero',
+        headRefName: 'docs/spec181-hoteleria-nucleo',
+        filePaths: ['docs/specs/SPEC-181-nucleo-hotelero.md']
+      })
+    ])
+
+    expect(result).toEqual([
+      { name: 'main' },
+      { name: 'docs/spec181-hoteleria-nucleo', prNumber: 85, prTitle: 'SPEC-181: Núcleo hotelero' }
+    ])
+  })
+
+  it('ignores a PR that changes no product document', () => {
+    const result = pickDocBranchesFromPullRequests([
+      pr({ headRefName: 'fix/leak', filePaths: ['server/services/auth.ts', 'README.md'] })
+    ])
     expect(result.map(b => b.name)).toEqual(['main'])
   })
 
-  it('keeps a branch when either docs folder differs', () => {
-    const result = pickBranchesWithDocChanges(main, [
-      ref({ name: 'feat/rf-only', rfOid: 'rf-other' }),
-      ref({ name: 'feat/specs-only', specsOid: 'specs-other' })
+  it('keeps a PR that mixes code and documents', () => {
+    const result = pickDocBranchesFromPullRequests([
+      pr({ headRefName: 'feat/x', filePaths: ['app/pages/docs.vue', 'docs/rf/RF-020.md'] })
     ])
-    expect(result.map(b => b.name)).toEqual(['main', 'feat/rf-only', 'feat/specs-only'])
-  })
-
-  it('drops a branch that carries neither docs folder', () => {
-    const result = pickBranchesWithDocChanges(main, [
-      ref({ name: 'feat/no-docs', rfOid: null, specsOid: null })
-    ])
-    expect(result.map(b => b.name)).toEqual(['main'])
+    expect(result.map(b => b.name)).toEqual(['main', 'feat/x'])
   })
 
   it('never lists the default branch twice', () => {
-    const result = pickBranchesWithDocChanges(main, [ref({ name: 'main', rfOid: 'rf-main' })])
+    const result = pickDocBranchesFromPullRequests([
+      pr({ headRefName: 'main', filePaths: ['docs/rf/RF-001.md'] })
+    ])
     expect(result).toEqual([{ name: 'main' }])
   })
 
-  it('carries the open pull request of a changed branch', () => {
-    const result = pickBranchesWithDocChanges(main, [
-      ref({ name: 'feat/x', rfOid: 'rf-other', prNumber: 42, prTitle: 'Nuevo RF' })
+  it('lists a branch once when several open PRs share its head', () => {
+    const result = pickDocBranchesFromPullRequests([
+      pr({ number: 9, headRefName: 'feat/dup', filePaths: ['docs/rf/RF-001.md'] }),
+      pr({ number: 4, headRefName: 'feat/dup', filePaths: ['docs/specs/SPEC-002.md'] })
     ])
-    expect(result[1]).toEqual({ name: 'feat/x', prNumber: 42, prTitle: 'Nuevo RF' })
+    expect(result.map(b => b.name)).toEqual(['main', 'feat/dup'])
+    expect(result[1]?.prNumber).toBe(9)
   })
 
-  it('omits pull request fields when the branch has none', () => {
-    const result = pickBranchesWithDocChanges(main, [ref({ name: 'feat/y', rfOid: 'rf-other' })])
-    expect(result[1]).toEqual({ name: 'feat/y' })
+  it('survives a PR whose file list came back empty', () => {
+    const result = pickDocBranchesFromPullRequests([pr({ headRefName: 'feat/empty' })])
+    expect(result.map(b => b.name)).toEqual(['main'])
   })
 })
 
