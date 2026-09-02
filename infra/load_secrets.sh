@@ -13,6 +13,7 @@ YAML="${YAML:-$(dirname "$0")/../app.yaml}"
 MAP="
 DATABASE_URL:horizon_db_url
 NUXT_CONFLUENCE_API_TOKEN:horizon_confluence_api_token
+NUXT_GITHUB_TOKEN:horizon_github_token
 NUXT_SLACK_WEBHOOK_URL:horizon_slack_webhook_url
 "
 

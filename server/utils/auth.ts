@@ -1,4 +1,4 @@
-import { createError, getHeader, type H3Event } from 'h3'
+import { createError, getHeader, getQuery, type H3Event } from 'h3'
 import { getAdminAuth } from './firebaseAdmin'
 import { isEmailAllowed } from './allowlist'
 
@@ -54,9 +54,27 @@ export async function verifyIdToken(idToken: string): Promise<VerifiedToken> {
  */
 export async function requireAuth(event: H3Event): Promise<VerifiedToken> {
   const header = getHeader(event, 'authorization') ?? ''
-  const [scheme, token] = header.split(' ')
+  let token: string | undefined
 
-  if (scheme !== 'Bearer' || !token) {
+  if (header) {
+    const [scheme, bearerToken] = header.split(' ')
+    if (scheme === 'Bearer' && bearerToken) {
+      token = bearerToken
+    }
+  }
+
+  if (!token) {
+    try {
+      const query = getQuery(event)
+      if (typeof query?.token === 'string' && query.token) {
+        token = query.token
+      }
+    } catch {
+      // Ignore if getQuery is unavailable in unit tests
+    }
+  }
+
+  if (!token) {
     throw createError({
       statusCode: 401,
       statusMessage: 'Missing or malformed Authorization header'

@@ -15,6 +15,7 @@ export default defineNuxtConfig({
     confluenceDomain: '',
     confluenceEmail: '',
     confluenceApiToken: '',
+    githubToken: '',
     public: {
       // Exposed Firebase client config.
       firebase: {
