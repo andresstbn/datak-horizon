@@ -5,7 +5,7 @@ import { resolveDocAsset, resolveDocLink } from '~~/shared/utils/docs'
 export function useDocRenderer() {
   const { getIdToken } = useAuth()
 
-  function createRenderer(currentTipo: DocType = 'rf', token?: string | null) {
+  function createRenderer(currentTipo: DocType = 'rf', token?: string | null, branch?: string) {
     const md = new MarkdownIt({
       html: true,
       linkify: true,
@@ -29,7 +29,7 @@ export function useDocRenderer() {
             tokenItem.attrSet('rel', 'noopener noreferrer')
             tokenItem.attrJoin('class', 'text-primary underline font-medium')
           } else {
-            const resolved = resolveDocLink(href, currentTipo)
+            const resolved = resolveDocLink(href, currentTipo, branch)
             tokenItem.attrSet('href', resolved)
             tokenItem.attrJoin('class', 'text-primary underline font-medium cursor-pointer')
           }
@@ -50,7 +50,7 @@ export function useDocRenderer() {
         const srcIndex = tokenItem.attrIndex('src')
         if (srcIndex >= 0) {
           const rawSrc = String(tokenItem.attrs?.[srcIndex]?.[1] ?? '')
-          let resolved = resolveDocAsset(rawSrc)
+          let resolved = resolveDocAsset(rawSrc, branch)
           if (token && resolved.startsWith('/api/docs/assets/')) {
             resolved += `${resolved.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
           }
@@ -102,11 +102,12 @@ export function useDocRenderer() {
 
   async function renderMarkdown(
     content: string,
-    currentTipo: DocType = 'rf'
+    currentTipo: DocType = 'rf',
+    branch?: string
   ): Promise<string> {
     if (!content) return ''
     const token = await getIdToken().catch(() => null)
-    const md = createRenderer(currentTipo, token)
+    const md = createRenderer(currentTipo, token, branch)
     return md.render(content)
   }
 

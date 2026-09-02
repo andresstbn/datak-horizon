@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DocIndexItem, DocType } from '~~/shared/types/doc'
-import { docStatusBadge } from '~~/shared/utils/docs'
+import { DEFAULT_DOC_BRANCH, docStatusBadge } from '~~/shared/utils/docs'
 
 definePageMeta({ pageTitle: 'Documentos de Producto' })
 
@@ -20,22 +20,76 @@ const {
   detailError,
   filters,
   filtered,
-  availableStatuses,
+  branches,
+  isBranchesLoading,
   rfCount,
   specsCount,
+  fetchBranches,
   fetchDocs,
   syncDocs,
   selectDoc,
+  setBranch,
   clearSelectedDoc
 } = useDocs()
+
+const {
+  thread: commentThread,
+  isLoading: isCommentsLoading,
+  isPosting: isCommentPosting,
+  errorMessage: commentsError,
+  hasOpenPr,
+  postComment
+} = useDocComments()
+
+const commentDraft = ref('')
 
 async function handleSync() {
   await syncDocs()
   toast.add({
     title: 'Sincronizado',
-    description: 'Documentos actualizados desde GitHub.',
+    description: `Documentos de "${filters.value.branch}" actualizados desde GitHub.`,
     icon: 'i-lucide-check'
   })
+}
+
+/**
+ * Switching branch drops the current selection: the document may not exist on
+ * the new ref, and its comments belong to the other branch's PR.
+ */
+async function handleBranchChange(branch: string) {
+  await setBranch(branch)
+
+  const query = { ...route.query }
+  delete query.tipo
+  delete query.doc
+  if (branch === DEFAULT_DOC_BRANCH) {
+    delete query.branch
+  } else {
+    query.branch = branch
+  }
+  router.replace({ query })
+}
+
+async function handlePostComment() {
+  const created = await postComment(commentDraft.value)
+  if (!created) return
+
+  commentDraft.value = ''
+  toast.add({
+    title: 'Comentario publicado',
+    description: `Quedó en el PR #${commentThread.value.prNumber} en GitHub.`,
+    icon: 'i-lucide-check'
+  })
+}
+
+const commentDateFormat = new Intl.DateTimeFormat('es-CO', {
+  dateStyle: 'medium',
+  timeStyle: 'short'
+})
+
+function formatCommentDate(iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? iso : commentDateFormat.format(date)
 }
 
 const { renderMarkdown } = useDocRenderer()
@@ -61,7 +115,7 @@ watch(
     }
     isRendering.value = true
     try {
-      renderedHtml.value = await renderMarkdown(newDoc.content, newDoc.tipo)
+      renderedHtml.value = await renderMarkdown(newDoc.content, newDoc.tipo, filters.value.branch)
     } catch (err) {
       console.error('Error rendering markdown:', err)
       renderedHtml.value = '<p class="text-error">Error al renderizar el documento.</p>'
@@ -74,7 +128,13 @@ watch(
 
 // Sync route params to selection
 async function syncFromRoute() {
-  await fetchDocs()
+  const qBranch = route.query.branch as string | undefined
+  if (qBranch && qBranch !== filters.value.branch) {
+    filters.value.branch = qBranch
+  }
+
+  await Promise.all([fetchBranches(), fetchDocs()])
+
   const qTipo = route.query.tipo as string | undefined
   const qDoc = route.query.doc as string | undefined
 
@@ -129,7 +189,8 @@ function handleBackToList() {
 }
 
 function getGitHubUrl(tipo: DocType, filename: string): string {
-  return `https://github.com/Datak-SAS/datak/blob/main/docs/${tipo}/${filename}`
+  const branch = encodeURIComponent(filters.value.branch)
+  return `https://github.com/Datak-SAS/datak/blob/${branch}/docs/${tipo}/${filename}`
 }
 
 async function copyDocumentLink() {
@@ -229,6 +290,23 @@ function setStatusFilter(status: string | 'all') {
           size="sm"
           class="w-full"
         )
+
+        //- Branch Selector
+        USelectMenu(
+          :model-value="filters.branch"
+          :items="branches"
+          label-key="name"
+          value-key="name"
+          icon="i-lucide-git-branch"
+          size="sm"
+          class="w-full"
+          :loading="isBranchesLoading"
+          :search-input="{ placeholder: 'Buscar rama...' }"
+          @update:model-value="handleBranchChange"
+        )
+          template(#item-trailing="{ item }")
+            UBadge(v-if="item.prNumber" color="primary" variant="subtle" size="sm")
+              | {{ `#${item.prNumber}` }}
 
         //- Type Filters (RF / SPEC)
         .flex.items-center.gap-1.rounded-lg.bg-muted.p-1(class="bg-opacity-20")
@@ -455,6 +533,100 @@ function setStatusFilter(status: string | 'all') {
               USkeleton(class="h-4 w-5/6")
               USkeleton(class="h-4 w-4/6")
             .doc-markdown-body(v-else v-html="renderedHtml")
+
+          //- Comment thread, backed by the open PR of the branch being viewed
+          section.mt-10.border-t.border-default.pt-6
+            .flex.items-center.justify-between.gap-2.mb-4
+              .flex.items-center.gap-2
+                UIcon.size-4.text-muted(name="i-lucide-message-square")
+                h3.text-sm.font-semibold.text-foreground Comentarios
+                UBadge(
+                  v-if="commentThread.comments.length"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                )
+                  | {{ commentThread.comments.length }}
+              UButton(
+                v-if="commentThread.prUrl"
+                :to="commentThread.prUrl"
+                target="_blank"
+                :label="`PR #${commentThread.prNumber}`"
+                icon="i-lucide-git-pull-request"
+                size="xs"
+                color="neutral"
+                variant="outline"
+              )
+
+            .space-y-3(v-if="isCommentsLoading")
+              USkeleton(class="h-16 w-full")
+              USkeleton(class="h-16 w-full")
+
+            UAlert(
+              v-else-if="!hasOpenPr"
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-info"
+              title="Sin PR abierto"
+              :description="`La rama ${filters.branch} no tiene un pull request abierto, así que todavía no hay dónde publicar comentarios.`"
+            )
+
+            template(v-else)
+              .space-y-3
+                .rounded-lg.border.border-default.bg-muted.p-3(
+                  v-for="comment in commentThread.comments"
+                  :key="comment.id"
+                  class="bg-opacity-10"
+                )
+                  .flex.items-center.gap-2.mb-2
+                    UAvatar(
+                      v-if="comment.authorAvatarUrl"
+                      :src="comment.authorAvatarUrl"
+                      :alt="comment.authorLogin"
+                      size="xs"
+                    )
+                    span.text-xs.font-semibold.text-foreground {{ comment.authorLogin }}
+                    span.text-xs.text-muted {{ formatCommentDate(comment.createdAt) }}
+                    a.ml-auto.text-xs.text-primary.underline(
+                      :href="comment.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    ) Ver en GitHub
+                  p.text-sm.text-foreground.whitespace-pre-wrap {{ comment.body }}
+
+                p.text-sm.text-muted(v-if="commentThread.comments.length === 0")
+                  | Nadie ha comentado este documento todavía.
+
+              .mt-4.space-y-2
+                UTextarea(
+                  v-model="commentDraft"
+                  :rows="3"
+                  :maxlength="10000"
+                  autoresize
+                  class="w-full"
+                  placeholder="Escribe un comentario para el equipo de producto..."
+                  :disabled="isCommentPosting"
+                )
+                .flex.flex-wrap.items-center.justify-between.gap-2
+                  p.text-xs.text-muted
+                    | Se publica en GitHub, con tu nombre, en el pull request de esta rama.
+                  UButton(
+                    :label="`Comentar en el PR #${commentThread.prNumber}`"
+                    icon="i-lucide-send"
+                    size="xs"
+                    color="primary"
+                    :loading="isCommentPosting"
+                    :disabled="!commentDraft.trim()"
+                    @click="handlePostComment"
+                  )
+
+            UAlert.mt-3(
+              v-if="commentsError"
+              color="error"
+              variant="subtle"
+              icon="i-lucide-triangle-alert"
+              :title="commentsError"
+            )
 </template>
 
 <style scoped>

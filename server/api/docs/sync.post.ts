@@ -1,13 +1,15 @@
 import { defineEventHandler } from 'h3'
 import { requireAuth } from '../../utils/auth'
+import { getBranchParam } from '../../utils/docsRequest'
 import { githubDocsService } from '../../services/githubDocsService'
 
 /**
- * POST /api/docs/sync — force re-syncs documents directly from GitHub,
- * bypassing cached values and returning the updated document index.
- * Thin handler: authenticates and delegates to githubDocsService.
+ * POST /api/docs/sync — invalidates the cached document tree of a branch and
+ * returns the freshly fetched index.
+ * Thin handler: authenticates, validates the branch and delegates.
  */
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
-  return githubDocsService.listDocs(true)
+  const branch = getBranchParam(event)
+  return githubDocsService.listDocs(branch, true)
 })

@@ -1,4 +1,7 @@
-import type { DocFilters, DocIndexItem, DocType } from '../types/doc'
+import type { DocBranch, DocFilters, DocIndexItem, DocType } from '../types/doc'
+
+/** Branch the viewer falls back to, and the one every other branch is compared against. */
+export const DEFAULT_DOC_BRANCH = 'main'
 
 export interface BadgeConfig {
   label: string
@@ -76,7 +79,11 @@ export function filterDocs(items: DocIndexItem[], filters: DocFilters): DocIndex
  * If it's a relative link to another markdown file, returns internal route.
  * Otherwise returns original href.
  */
-export function resolveDocLink(href: string, currentTipo: DocType = 'rf'): string {
+export function resolveDocLink(
+  href: string,
+  currentTipo: DocType = 'rf',
+  branch?: string
+): string {
   if (!href) return href
 
   // External links or anchor-only
@@ -106,8 +113,11 @@ export function resolveDocLink(href: string, currentTipo: DocType = 'rf'): strin
 
   const filename = cleanPath.split('/').pop() ?? cleanPath
   const hash = hashPart ? `#${hashPart}` : ''
+  const branchParam = branch && branch !== DEFAULT_DOC_BRANCH
+    ? `&branch=${encodeURIComponent(branch)}`
+    : ''
 
-  return `/docs?tipo=${targetTipo}&doc=${encodeURIComponent(filename)}${hash}`
+  return `/docs?tipo=${targetTipo}&doc=${encodeURIComponent(filename)}${branchParam}${hash}`
 }
 
 /**
@@ -115,7 +125,7 @@ export function resolveDocLink(href: string, currentTipo: DocType = 'rf'): strin
  * (e.g. `../assets/RF-001/diagram.png` or `assets/RF-001/diagram.png`)
  * to `/api/docs/assets/:pageId/:name`.
  */
-export function resolveDocAsset(src: string): string {
+export function resolveDocAsset(src: string, branch?: string): string {
   if (!src) return src
   if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/api/')) {
     return src
@@ -126,8 +136,60 @@ export function resolveDocAsset(src: string): string {
   if (match && match[1] && match[2]) {
     const pageId = match[1]
     const filename = match[2]
-    return `/api/docs/assets/${encodeURIComponent(pageId)}/${encodeURIComponent(filename)}`
+    const query = branch && branch !== DEFAULT_DOC_BRANCH
+      ? `?branch=${encodeURIComponent(branch)}`
+      : ''
+    return `/api/docs/assets/${encodeURIComponent(pageId)}/${encodeURIComponent(filename)}${query}`
   }
 
   return src
+}
+
+/**
+ * Hidden anchor appended to every PR comment written from Horizon, so a PR that
+ * touches several documents keeps one thread per document. GitHub renders HTML
+ * comments as nothing, so it stays invisible to readers on GitHub too.
+ */
+export function docCommentMarker(tipo: DocType, filename: string): string {
+  return `<!-- horizon:doc=${tipo}/${filename} -->`
+}
+
+/** Removes the anchor before showing a comment body in Horizon. */
+export function stripDocCommentMarker(body: string): string {
+  return body.replace(/\n?<!--\s*horizon:doc=[^>]*-->\s*$/, '').trimEnd()
+}
+
+/** Tree oids of the two docs folders on a single ref. */
+export interface RefDocTrees {
+  name: string
+  rfOid: string | null
+  specsOid: string | null
+  prNumber?: number
+  prTitle?: string
+}
+
+/**
+ * Keeps only the branches worth offering in the viewer: the default branch, plus
+ * any ref whose `docs/rf` or `docs/specs` tree differs from it. A ref carrying
+ * neither folder has nothing to show and is dropped.
+ */
+export function pickBranchesWithDocChanges(
+  main: { rfOid: string | null, specsOid: string | null },
+  refs: RefDocTrees[],
+  defaultBranch: string = DEFAULT_DOC_BRANCH
+): DocBranch[] {
+  const branches: DocBranch[] = [{ name: defaultBranch }]
+
+  for (const ref of refs) {
+    if (ref.name === defaultBranch) continue
+    if (!ref.rfOid && !ref.specsOid) continue
+    if (ref.rfOid === main.rfOid && ref.specsOid === main.specsOid) continue
+
+    branches.push({
+      name: ref.name,
+      ...(ref.prNumber ? { prNumber: ref.prNumber, prTitle: ref.prTitle } : {})
+    })
+  }
+
+  return branches
 }

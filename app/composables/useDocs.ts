@@ -1,6 +1,6 @@
 import { docService } from '~/services/docService'
-import type { DocDetail, DocFilters, DocIndexItem, DocType } from '~~/shared/types/doc'
-import { filterDocs } from '~~/shared/utils/docs'
+import type { DocBranch, DocDetail, DocFilters, DocIndexItem, DocType } from '~~/shared/types/doc'
+import { DEFAULT_DOC_BRANCH, filterDocs } from '~~/shared/utils/docs'
 
 export function useDocs() {
   const { getIdToken } = useAuth()
@@ -14,14 +14,54 @@ export function useDocs() {
   const detailError = useState<string | null>('docs:detailError', () => null)
   const isSyncing = useState<boolean>('docs:syncing', () => false)
 
+  const branches = useState<DocBranch[]>('docs:branches', () => [])
+  const isBranchesLoading = useState<boolean>('docs:branchesLoading', () => false)
+
   const filters = useState<DocFilters>('docs:filters', () => ({
     tipo: 'rf',
     estado: 'all',
-    search: ''
+    search: '',
+    branch: DEFAULT_DOC_BRANCH
   }))
 
+  // Branch the cached `items` actually belong to, so switching branches cannot
+  // be short-circuited by the "already loaded" guard below.
+  const loadedBranch = useState<string | null>('docs:loadedBranch', () => null)
+
+  const currentBranch = computed(() => filters.value.branch)
+
+  const currentBranchInfo = computed<DocBranch | undefined>(() =>
+    branches.value.find(b => b.name === filters.value.branch)
+  )
+
+  function readErrorMessage(err: unknown, fallback: string): string {
+    const dataMsg = (err as { data?: { statusMessage?: string, message?: string } })?.data?.statusMessage
+      || (err as { statusMessage?: string })?.statusMessage
+      || (err as Error)?.message
+    return dataMsg || fallback
+  }
+
+  async function fetchBranches(): Promise<void> {
+    if (branches.value.length > 0 || isBranchesLoading.value) return
+
+    const token = await getIdToken()
+    if (!token) return
+
+    isBranchesLoading.value = true
+    try {
+      branches.value = await docService.listBranches(token)
+    } catch (err: unknown) {
+      // A failing branch list must not block the documents themselves.
+      console.error('Error fetching docs branches:', err)
+      branches.value = [{ name: DEFAULT_DOC_BRANCH }]
+    } finally {
+      isBranchesLoading.value = false
+    }
+  }
+
   async function fetchDocs(force = false): Promise<void> {
-    if (items.value.length > 0 && !force && !isLoading.value) return
+    const branch = filters.value.branch
+    if (items.value.length > 0 && loadedBranch.value === branch && !force && !isLoading.value) return
 
     const token = await getIdToken()
     if (!token) {
@@ -32,14 +72,13 @@ export function useDocs() {
     isLoading.value = true
     errorMessage.value = null
     try {
-      items.value = await docService.list(token, force)
+      items.value = await docService.list(token, branch, force)
+      loadedBranch.value = branch
     } catch (err: unknown) {
       console.error('Error fetching docs index:', err)
-      const dataMsg = (err as { data?: { statusMessage?: string, message?: string } })?.data?.statusMessage
-        || (err as { statusMessage?: string })?.statusMessage
-        || (err as Error)?.message
-      errorMessage.value = dataMsg || 'No se pudieron cargar los documentos del monorepo.'
+      errorMessage.value = readErrorMessage(err, 'No se pudieron cargar los documentos del monorepo.')
       items.value = []
+      loadedBranch.value = null
     } finally {
       isLoading.value = false
     }
@@ -49,19 +88,18 @@ export function useDocs() {
     const token = await getIdToken()
     if (!token) return
 
+    const branch = filters.value.branch
     isSyncing.value = true
     errorMessage.value = null
     try {
-      items.value = await docService.sync(token)
+      items.value = await docService.sync(token, branch)
+      loadedBranch.value = branch
       if (selectedDoc.value) {
         await selectDoc(selectedDoc.value.tipo, selectedDoc.value.filename, true)
       }
     } catch (err: unknown) {
       console.error('Error syncing docs with GitHub:', err)
-      const dataMsg = (err as { data?: { statusMessage?: string, message?: string } })?.data?.statusMessage
-        || (err as { statusMessage?: string })?.statusMessage
-        || (err as Error)?.message
-      errorMessage.value = dataMsg || 'No se pudieron sincronizar los documentos con GitHub.'
+      errorMessage.value = readErrorMessage(err, 'No se pudieron sincronizar los documentos con GitHub.')
     } finally {
       isSyncing.value = false
     }
@@ -86,7 +124,7 @@ export function useDocs() {
     isDetailLoading.value = true
     detailError.value = null
     try {
-      const detail = await docService.getByPath(token, tipo, filename, force)
+      const detail = await docService.getByPath(token, tipo, filename, filters.value.branch, force)
       selectedDoc.value = detail
       return detail
     } catch (err: unknown) {
@@ -102,6 +140,20 @@ export function useDocs() {
   function clearSelectedDoc() {
     selectedDoc.value = null
     detailError.value = null
+  }
+
+  /**
+   * Switches branch: the previous branch's documents and selection are dropped
+   * before reloading, since neither is valid on the new ref.
+   */
+  async function setBranch(branch: string): Promise<void> {
+    if (branch === filters.value.branch) return
+
+    filters.value.branch = branch
+    items.value = []
+    loadedBranch.value = null
+    clearSelectedDoc()
+    await fetchDocs()
   }
 
   const filtered = computed(() => filterDocs(items.value, filters.value))
@@ -129,12 +181,18 @@ export function useDocs() {
     detailError,
     filters,
     filtered,
+    branches,
+    isBranchesLoading,
+    currentBranch,
+    currentBranchInfo,
     availableStatuses,
     rfCount,
     specsCount,
+    fetchBranches,
     fetchDocs,
     syncDocs,
     selectDoc,
+    setBranch,
     clearSelectedDoc
   }
 }
