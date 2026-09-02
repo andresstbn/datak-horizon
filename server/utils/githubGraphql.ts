@@ -40,19 +40,28 @@ export async function githubGraphql<T>(
     body: { query, variables }
   })
 
-  if (response.errors && response.errors.length > 0) {
-    const msg = response.errors.map(e => e.message).join(', ')
-    if (msg.includes('Resource not accessible by personal access token')) {
-      throw httpError(
-        403,
-        'El token de GitHub no tiene los permisos necesarios (Contents: Read-only y, para comentar, Pull requests: Read and write) o requiere aprobación del administrador en Datak-SAS.'
-      )
-    }
-    throw new Error(`GitHub GraphQL error: ${msg}`)
+  const errors = response.errors ?? []
+  const msg = errors.map(e => e.message).join(', ')
+
+  if (msg.includes('Resource not accessible by personal access token')) {
+    throw httpError(
+      403,
+      'El token de GitHub no tiene los permisos necesarios (Contents: Read-only y, para comentar, Pull requests: Read and write) o requiere aprobación del administrador en Datak-SAS.'
+    )
   }
 
+  // GraphQL reports an unresolvable subfield as an error entry *alongside* usable
+  // data. Treating any error as fatal threw away whole responses, which is what
+  // silently reduced the branch picker to `main`. Only a response with no data
+  // at all is a real failure.
   if (!response.data) {
-    throw new Error('GitHub GraphQL devolvió una respuesta vacía')
+    throw new Error(
+      errors.length > 0 ? `GitHub GraphQL error: ${msg}` : 'GitHub GraphQL devolvió una respuesta vacía'
+    )
+  }
+
+  if (errors.length > 0) {
+    console.warn(`GitHub GraphQL respondió con datos parciales: ${msg}`)
   }
 
   return response.data

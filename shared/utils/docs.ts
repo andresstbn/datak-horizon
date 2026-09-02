@@ -1,6 +1,6 @@
 import type { DocBranch, DocFilters, DocIndexItem, DocType } from '../types/doc'
 
-/** Branch the viewer falls back to, and the one every other branch is compared against. */
+/** Branch the viewer shows when no other one is selected. */
 export const DEFAULT_DOC_BRANCH = 'main'
 
 export interface BadgeConfig {
@@ -159,36 +159,40 @@ export function stripDocCommentMarker(body: string): string {
   return body.replace(/\n?<!--\s*horizon:doc=[^>]*-->\s*$/, '').trimEnd()
 }
 
-/** Tree oids of the two docs folders on a single ref. */
-export interface RefDocTrees {
-  name: string
-  rfOid: string | null
-  specsOid: string | null
-  prNumber?: number
-  prTitle?: string
+/** Paths a pull request touches, as far as the docs viewer cares. */
+export interface PullRequestDocFiles {
+  number: number
+  title: string
+  headRefName: string
+  filePaths: string[]
+}
+
+/** True for the files the viewer actually renders. */
+export function isProductDocPath(path: string): boolean {
+  return path.startsWith('docs/rf/') || path.startsWith('docs/specs/')
 }
 
 /**
- * Keeps only the branches worth offering in the viewer: the default branch, plus
- * any ref whose `docs/rf` or `docs/specs` tree differs from it. A ref carrying
- * neither folder has nothing to show and is dropped.
+ * Branches offered in the viewer: the default branch, plus the head of every
+ * open pull request that touches an RF or a SPEC.
+ *
+ * Comparing docs tree oids against `main` was tried first and does not work: it
+ * also flags every branch that merely predates the last docs change on main, and
+ * it needs a per-ref scan that GitHub only returns alphabetically.
  */
-export function pickBranchesWithDocChanges(
-  main: { rfOid: string | null, specsOid: string | null },
-  refs: RefDocTrees[],
+export function pickDocBranchesFromPullRequests(
+  pullRequests: PullRequestDocFiles[],
   defaultBranch: string = DEFAULT_DOC_BRANCH
 ): DocBranch[] {
   const branches: DocBranch[] = [{ name: defaultBranch }]
+  const seen = new Set<string>([defaultBranch])
 
-  for (const ref of refs) {
-    if (ref.name === defaultBranch) continue
-    if (!ref.rfOid && !ref.specsOid) continue
-    if (ref.rfOid === main.rfOid && ref.specsOid === main.specsOid) continue
+  for (const pr of pullRequests) {
+    if (seen.has(pr.headRefName)) continue
+    if (!pr.filePaths.some(isProductDocPath)) continue
 
-    branches.push({
-      name: ref.name,
-      ...(ref.prNumber ? { prNumber: ref.prNumber, prTitle: ref.prTitle } : {})
-    })
+    seen.add(pr.headRefName)
+    branches.push({ name: pr.headRefName, prNumber: pr.number, prTitle: pr.title })
   }
 
   return branches
