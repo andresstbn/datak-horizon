@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getQuery, getRouterParam } from 'h3'
 import { requireAuth } from '../../../utils/auth'
+import { getBranchParam, parseDocType } from '../../../utils/docsRequest'
 import { githubDocsService } from '../../../services/githubDocsService'
-import type { DocType } from '~~/shared/types/doc'
 
 /**
  * GET /api/docs/:tipo/:filename — returns frontmatter and markdown body of a document.
@@ -10,15 +10,8 @@ import type { DocType } from '~~/shared/types/doc'
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
 
-  const tipo = getRouterParam(event, 'tipo') as DocType
+  const tipo = parseDocType(getRouterParam(event, 'tipo'))
   const filename = getRouterParam(event, 'filename')
-
-  if (!tipo || (tipo !== 'rf' && tipo !== 'specs')) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'El tipo de documento debe ser "rf" o "specs"'
-    })
-  }
 
   if (!filename) {
     throw createError({
@@ -27,14 +20,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const branch = getBranchParam(event)
   const query = getQuery(event)
   const force = query.force === 'true' || query.force === '1'
 
-  const doc = await githubDocsService.getDoc(tipo, filename, force)
+  const doc = await githubDocsService.getDoc(tipo, filename, branch, force)
   if (!doc) {
     throw createError({
       statusCode: 404,
-      statusMessage: `Documento no encontrado: ${tipo}/${filename}`
+      statusMessage: `Documento no encontrado en "${branch}": ${tipo}/${filename}`
     })
   }
 

@@ -1,6 +1,17 @@
-import { createError } from 'h3'
-import type { DocDetail, DocIndexItem, DocType } from '~~/shared/types/doc'
+import type { DocBranch, DocDetail, DocIndexItem, DocType } from '~~/shared/types/doc'
 import { parseFrontmatter } from '~~/shared/utils/frontmatter'
+import {
+  DEFAULT_DOC_BRANCH,
+  pickBranchesWithDocChanges,
+  type RefDocTrees
+} from '~~/shared/utils/docs'
+import {
+  GITHUB_REPO_NAME,
+  GITHUB_REPO_OWNER,
+  getGitHubToken,
+  githubGraphql
+} from '../utils/githubGraphql'
+import { httpError } from '../utils/httpError'
 
 interface GitHubBlob {
   text?: string
@@ -15,14 +26,11 @@ interface GitHubTree {
   entries?: GitHubTreeEntry[]
 }
 
-interface GitHubGraphQLResponse {
-  data?: {
-    repository?: {
-      rf?: GitHubTree | null
-      specs?: GitHubTree | null
-    } | null
-  }
-  errors?: Array<{ message: string }>
+interface DocsTreeData {
+  repository?: {
+    rf?: GitHubTree | null
+    specs?: GitHubTree | null
+  } | null
 }
 
 interface RawDocsCache {
@@ -35,103 +43,140 @@ interface CachedAsset {
   contentType: string
 }
 
-const GITHUB_GRAPHQL_ENDPOINT = 'https://api.github.com/graphql'
-const GITHUB_REPO_OWNER = 'Datak-SAS'
-const GITHUB_REPO_NAME = 'datak'
-const GITHUB_BRANCH = 'main'
+interface BranchesData {
+  repository?: {
+    mainRf?: { oid?: string } | null
+    mainSpecs?: { oid?: string } | null
+    refs?: {
+      nodes?: Array<{
+        name: string
+        target?: {
+          rf?: { oid?: string } | null
+          specs?: { oid?: string } | null
+        } | null
+        associatedPullRequests?: {
+          nodes?: Array<{ number: number, title: string }>
+        } | null
+      }>
+    } | null
+  } | null
+}
 
-async function fetchRawDocsTree(token: string): Promise<RawDocsCache> {
-  const query = `
-    query GetMonorepoDocsTree($owner: String!, $name: String!) {
-      repository(owner: $owner, name: $name) {
-        rf: object(expression: "${GITHUB_BRANCH}:docs/rf") {
-          ... on Tree {
-            entries {
-              name
-              object {
-                ... on Blob {
-                  text
-                }
+const DOCS_TREE_QUERY = `
+  query GetMonorepoDocsTree($owner: String!, $name: String!, $rfExpr: String!, $specsExpr: String!) {
+    repository(owner: $owner, name: $name) {
+      rf: object(expression: $rfExpr) {
+        ... on Tree {
+          entries {
+            name
+            object {
+              ... on Blob {
+                text
               }
             }
           }
         }
-        specs: object(expression: "${GITHUB_BRANCH}:docs/specs") {
-          ... on Tree {
-            entries {
-              name
-              object {
-                ... on Blob {
-                  text
-                }
+      }
+      specs: object(expression: $specsExpr) {
+        ... on Tree {
+          entries {
+            name
+            object {
+              ... on Blob {
+                text
               }
             }
           }
         }
       }
     }
-  `
+  }
+`
 
-  const response = await $fetch<GitHubGraphQLResponse>(GITHUB_GRAPHQL_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'Datak-Horizon-Docs-Viewer'
-    },
-    body: {
-      query,
-      variables: {
-        owner: GITHUB_REPO_OWNER,
-        name: GITHUB_REPO_NAME
+const BRANCHES_QUERY = `
+  query GetDocsBranches($owner: String!, $name: String!, $mainRfExpr: String!, $mainSpecsExpr: String!) {
+    repository(owner: $owner, name: $name) {
+      mainRf: object(expression: $mainRfExpr) {
+        ... on Tree { oid }
+      }
+      mainSpecs: object(expression: $mainSpecsExpr) {
+        ... on Tree { oid }
+      }
+      refs(refPrefix: "refs/heads/", first: 30, orderBy: { field: TAG_COMMIT_DATE, direction: DESC }) {
+        nodes {
+          name
+          target {
+            ... on Commit {
+              rf: file(path: "docs/rf") { oid }
+              specs: file(path: "docs/specs") { oid }
+            }
+          }
+          associatedPullRequests(first: 1, states: OPEN) {
+            nodes {
+              number
+              title
+            }
+          }
+        }
       }
     }
+  }
+`
+
+/**
+ * Fetches every RF and SPEC body for a branch in a single GraphQL round trip.
+ * The trailing `force` argument is unused here: it only drives
+ * `shouldInvalidateCache` on the cached wrapper below.
+ */
+async function fetchRawDocsTree(token: string, branch: string, _force: boolean): Promise<RawDocsCache> {
+  const data = await githubGraphql<DocsTreeData>(token, DOCS_TREE_QUERY, {
+    owner: GITHUB_REPO_OWNER,
+    name: GITHUB_REPO_NAME,
+    rfExpr: `${branch}:docs/rf`,
+    specsExpr: `${branch}:docs/specs`
   })
 
-  if (response.errors && response.errors.length > 0) {
-    const msg = response.errors.map(e => e.message).join(', ')
-    if (msg.includes('Resource not accessible by personal access token')) {
-      throw new Error(
-        'El token de GitHub no tiene permisos de lectura sobre el contenido (Contents: Read-only) o requiere aprobación del administrador en Datak-SAS.'
-      )
-    }
-    throw new Error(`GitHub GraphQL error: ${msg}`)
+  const rfTree = data.repository?.rf
+  const specsTree = data.repository?.specs
+
+  // GitHub answers a missing ref (or a missing folder) with a null object rather
+  // than an error, which would otherwise surface as a silently empty list.
+  if (!rfTree && !specsTree) {
+    throw httpError(404, `La rama "${branch}" no existe o no tiene documentos.`)
   }
 
-  const rfEntries = response.data?.repository?.rf?.entries ?? []
-  const specsEntries = response.data?.repository?.specs?.entries ?? []
+  const toEntries = (tree?: GitHubTree | null) =>
+    (tree?.entries ?? [])
+      .filter(e => e.name.endsWith('.md') && e.object?.text)
+      .map(e => ({ name: e.name, text: e.object!.text! }))
 
-  const rf = rfEntries
-    .filter(e => e.name.endsWith('.md') && e.object?.text)
-    .map(e => ({ name: e.name, text: e.object!.text! }))
-
-  const specs = specsEntries
-    .filter(e => e.name.endsWith('.md') && e.object?.text)
-    .map(e => ({ name: e.name, text: e.object!.text! }))
-
-  return { rf, specs }
+  return { rf: toEntries(rfTree), specs: toEntries(specsTree) }
 }
 
 /**
  * Nitro cached function to fetch all docs in a single GraphQL query.
- * Cached for 5 minutes (TTL 300s).
+ * Cached for 5 minutes (TTL 300s), keyed per branch.
  */
 const fetchRawDocsTreeCached = defineCachedFunction(
   fetchRawDocsTree,
   {
     maxAge: 60 * 5, // 5 minutes
     name: 'githubDocsTree',
-    getKey: () => `${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/docs-tree`
+    // `force` is deliberately absent from the key: a forced refresh must replace
+    // the shared entry, not create a parallel one.
+    getKey: (_token: string, branch: string, _force: boolean) =>
+      `${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/${branch}/docs-tree`,
+    shouldInvalidateCache: (_token: string, _branch: string, force: boolean) => force
   }
 )
 
 /**
  * Nitro cached function to proxy and cache asset image binaries from GitHub.
- * Cached for 1 hour.
+ * Cached for 1 hour, keyed per branch.
  */
 const fetchAssetCached = defineCachedFunction(
-  async (token: string, pageId: string, name: string): Promise<CachedAsset> => {
-    const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/docs/assets/${encodeURIComponent(pageId)}/${encodeURIComponent(name)}?ref=${GITHUB_BRANCH}`
+  async (token: string, branch: string, pageId: string, name: string): Promise<CachedAsset> => {
+    const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/docs/assets/${encodeURIComponent(pageId)}/${encodeURIComponent(name)}?ref=${encodeURIComponent(branch)}`
 
     const rawBuffer = await $fetch<ArrayBuffer>(url, {
       headers: {
@@ -162,21 +207,10 @@ const fetchAssetCached = defineCachedFunction(
   {
     maxAge: 60 * 60, // 1 hour
     name: 'githubDocsAsset',
-    getKey: (_token, pageId, name) => `${pageId}/${name}`
+    getKey: (_token: string, branch: string, pageId: string, name: string) =>
+      `${branch}/${pageId}/${name}`
   }
 )
-
-function getGitHubToken(): string {
-  const config = useRuntimeConfig()
-  const token = (config.githubToken as string) || process.env.NUXT_GITHUB_TOKEN
-  if (!token) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'GitHub token no configurado (NUXT_GITHUB_TOKEN)'
-    })
-  }
-  return token
-}
 
 function buildIndexFromCategory(
   entries: Array<{ name: string, text: string }>,
@@ -218,16 +252,54 @@ function sortDocsRecentFirst(a: DocIndexItem, b: DocIndexItem): number {
   return b.id.localeCompare(a.id, undefined, { numeric: true })
 }
 
+const listBranchesCached = defineCachedFunction(
+  async (token: string): Promise<DocBranch[]> => {
+    const data = await githubGraphql<BranchesData>(token, BRANCHES_QUERY, {
+      owner: GITHUB_REPO_OWNER,
+      name: GITHUB_REPO_NAME,
+      mainRfExpr: `${DEFAULT_DOC_BRANCH}:docs/rf`,
+      mainSpecsExpr: `${DEFAULT_DOC_BRANCH}:docs/specs`
+    })
+
+    const repo = data.repository
+    const main = {
+      rfOid: repo?.mainRf?.oid ?? null,
+      specsOid: repo?.mainSpecs?.oid ?? null
+    }
+
+    const refs: RefDocTrees[] = (repo?.refs?.nodes ?? []).map((node) => {
+      const pr = node.associatedPullRequests?.nodes?.[0]
+      return {
+        name: node.name,
+        rfOid: node.target?.rf?.oid ?? null,
+        specsOid: node.target?.specs?.oid ?? null,
+        ...(pr ? { prNumber: pr.number, prTitle: pr.title } : {})
+      }
+    })
+
+    return pickBranchesWithDocChanges(main, refs)
+  },
+  {
+    maxAge: 60 * 5, // 5 minutes
+    name: 'githubDocsBranches',
+    getKey: () => `${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/branches`
+  }
+)
+
 export const githubDocsService = {
   /**
-   * Retrieves the combined index of RF and SPEC documents, ordered most recent first.
-   * @param force If true, fetches directly from GitHub bypassing Nitro cached function.
+   * Lists the branches whose product docs differ from the default branch.
    */
-  async listDocs(force = false): Promise<DocIndexItem[]> {
-    const token = getGitHubToken()
-    const raw = force
-      ? await fetchRawDocsTree(token)
-      : await fetchRawDocsTreeCached(token)
+  async listBranches(): Promise<DocBranch[]> {
+    return listBranchesCached(getGitHubToken())
+  },
+
+  /**
+   * Retrieves the combined index of RF and SPEC documents, ordered most recent first.
+   * @param force If true, invalidates and refreshes the cached tree for this branch.
+   */
+  async listDocs(branch: string = DEFAULT_DOC_BRANCH, force = false): Promise<DocIndexItem[]> {
+    const raw = await fetchRawDocsTreeCached(getGitHubToken(), branch, force)
 
     const rfDocs = buildIndexFromCategory(raw.rf, 'rf').sort(sortDocsRecentFirst)
     const specsDocs = buildIndexFromCategory(raw.specs, 'specs').sort(sortDocsRecentFirst)
@@ -237,13 +309,15 @@ export const githubDocsService = {
 
   /**
    * Retrieves a single document by type ('rf' | 'specs') and filename.
-   * @param force If true, fetches fresh document tree directly from GitHub.
+   * @param force If true, invalidates and refreshes the cached tree for this branch.
    */
-  async getDoc(tipo: DocType, filename: string, force = false): Promise<DocDetail | null> {
-    const token = getGitHubToken()
-    const raw = force
-      ? await fetchRawDocsTree(token)
-      : await fetchRawDocsTreeCached(token)
+  async getDoc(
+    tipo: DocType,
+    filename: string,
+    branch: string = DEFAULT_DOC_BRANCH,
+    force = false
+  ): Promise<DocDetail | null> {
+    const raw = await fetchRawDocsTreeCached(getGitHubToken(), branch, force)
 
     const categoryEntries = tipo === 'rf' ? raw.rf : raw.specs
     const entry = categoryEntries.find(e => e.name === filename || e.name === `${filename}.md`)
@@ -263,14 +337,13 @@ export const githubDocsService = {
   },
 
   /**
-   * Retrieves a private image asset binary.
+   * Retrieves a private image asset binary from a given branch.
    */
-  async getAsset(pageId: string, name: string): Promise<CachedAsset | null> {
-    const token = getGitHubToken()
+  async getAsset(branch: string, pageId: string, name: string): Promise<CachedAsset | null> {
     try {
-      return await fetchAssetCached(token, pageId, name)
+      return await fetchAssetCached(getGitHubToken(), branch, pageId, name)
     } catch (err) {
-      console.error(`Error loading doc asset ${pageId}/${name}:`, err)
+      console.error(`Error loading doc asset ${branch}/${pageId}/${name}:`, err)
       return null
     }
   }

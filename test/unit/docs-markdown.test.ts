@@ -137,31 +137,31 @@ describe('filterDocs', () => {
   ]
 
   it('filters by document type', () => {
-    const rfOnly = filterDocs(sampleDocs, { tipo: 'rf', estado: 'all', search: '' })
+    const rfOnly = filterDocs(sampleDocs, { tipo: 'rf', estado: 'all', search: '', branch: 'main' })
     expect(rfOnly.length).toBe(2)
     expect(rfOnly.every(d => d.tipo === 'rf')).toBe(true)
 
-    const specsOnly = filterDocs(sampleDocs, { tipo: 'specs', estado: 'all', search: '' })
+    const specsOnly = filterDocs(sampleDocs, { tipo: 'specs', estado: 'all', search: '', branch: 'main' })
     expect(specsOnly.length).toBe(1)
     expect(specsOnly[0]?.id).toBe('SPEC-001')
   })
 
   it('filters by status', () => {
-    const aprobadas = filterDocs(sampleDocs, { tipo: 'rf', estado: 'APROBADA', search: '' })
+    const aprobadas = filterDocs(sampleDocs, { tipo: 'rf', estado: 'APROBADA', search: '', branch: 'main' })
     expect(aprobadas.length).toBe(1)
     expect(aprobadas[0]?.id).toBe('RF-001')
   })
 
   it('filters by search keyword across id, title, authors, filename', () => {
-    const searchAuth = filterDocs(sampleDocs, { tipo: 'rf', estado: 'all', search: 'google' })
+    const searchAuth = filterDocs(sampleDocs, { tipo: 'rf', estado: 'all', search: 'google', branch: 'main' })
     expect(searchAuth.length).toBe(1)
     expect(searchAuth[0]?.id).toBe('RF-001')
 
-    const searchAuthor = filterDocs(sampleDocs, { tipo: 'rf', estado: 'all', search: 'camilo' })
+    const searchAuthor = filterDocs(sampleDocs, { tipo: 'rf', estado: 'all', search: 'camilo', branch: 'main' })
     expect(searchAuthor.length).toBe(1)
     expect(searchAuthor[0]?.id).toBe('RF-002')
 
-    const searchId = filterDocs(sampleDocs, { tipo: 'specs', estado: 'all', search: 'SPEC-001' })
+    const searchId = filterDocs(sampleDocs, { tipo: 'specs', estado: 'all', search: 'SPEC-001', branch: 'main' })
     expect(searchId.length).toBe(1)
   })
 })

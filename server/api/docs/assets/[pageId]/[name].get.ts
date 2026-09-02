@@ -1,5 +1,6 @@
 import { createError, defineEventHandler, getRouterParam, setHeader } from 'h3'
 import { requireAuth } from '../../../../utils/auth'
+import { getBranchParam } from '../../../../utils/docsRequest'
 import { githubDocsService } from '../../../../services/githubDocsService'
 
 /**
@@ -19,7 +20,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const asset = await githubDocsService.getAsset(pageId, name)
+  const branch = getBranchParam(event)
+  const asset = await githubDocsService.getAsset(branch, pageId, name)
   if (!asset) {
     throw createError({
       statusCode: 404,
@@ -28,6 +30,6 @@ export default defineEventHandler(async (event) => {
   }
 
   setHeader(event, 'Content-Type', asset.contentType)
-  setHeader(event, 'Cache-Control', 'public, max-age=300')
+  setHeader(event, 'Cache-Control', 'private, max-age=300')
   return Buffer.from(asset.base64, 'base64')
 })
