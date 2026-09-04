@@ -9,6 +9,7 @@ export const DEFAULT_ALLOWED_EMAILS: readonly string[] = Object.freeze([
   // `server/db/seed.ts` are deliberately absent: they only populate the local
   // database and cannot sign in (`.example` is a reserved TLD, so no Google
   // account can exist there). Use `NUXT_AUTH_ALLOWLIST` for local overrides.
+  'alejandro@datak.co',
   'daestebanc@gmail.com',
   'daniel@datak.co',
   'eduardo.luna@datak.co',

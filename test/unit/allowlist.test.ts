@@ -31,6 +31,7 @@ describe('allowlist utility', () => {
   describe('DEFAULT_ALLOWED_EMAILS', () => {
     it('contains exactly the audited real users', () => {
       expect([...DEFAULT_ALLOWED_EMAILS]).toEqual([
+        'alejandro@datak.co',
         'daestebanc@gmail.com',
         'daniel@datak.co',
         'eduardo.luna@datak.co',
@@ -57,6 +58,7 @@ describe('allowlist utility', () => {
 
   describe('isEmailAllowed', () => {
     it('authorizes audited team members in default allowlist', () => {
+      expect(isEmailAllowed('alejandro@datak.co')).toBe(true)
       expect(isEmailAllowed('daniel@datak.co')).toBe(true)
       expect(isEmailAllowed('DANIEL@DATAK.CO')).toBe(true)
       expect(isEmailAllowed('  tania@datak.co  ')).toBe(true)
